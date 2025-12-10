@@ -3,13 +3,14 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
+
 name: 01_warm-up
 
 on:
   push:
-    branches: [ "Sohamworkspace" ]
+    branches: [ "Group03" ]
   pull_request:
-    branches: [ "Sohamworkspace" ]
+    branches: [ "Group03" ]
 
 permissions:
   contents: read
