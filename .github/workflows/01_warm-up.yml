@@ -7,9 +7,9 @@ name: 01_warm-up
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "Suneetworkspace" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "Suneetworkspace" ]
 
 permissions:
   contents: read
