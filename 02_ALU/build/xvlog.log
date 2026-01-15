@@ -1,0 +1,6 @@
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "F:/Projects1/ADS1/ADSProject-main/ADSProject/02_ALU/generated-src/ALU.v" into library work
+INFO: [VRFC 10-311] analyzing module ALU
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "F:/Projects1/ADS1/ADSProject-main/ADSProject/02_ALU/src/test/uvm/alu_tb_config_pkg.sv" into library work
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "F:/Projects1/ADS1/ADSProject-main/ADSProject/02_ALU/src/test/uvm/alu_if.sv" into library work
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "F:/Projects1/ADS1/ADSProject-main/ADSProject/02_ALU/src/test/uvm/alu_seq_item.sv" into library work
+ERROR: [VRFC 10-2989] 'operandA' is not declared [F:/Projects1/ADS1/ADSProject-main/ADSProject/02_ALU/src/test/uvm/alu_seq_item.sv:21]
