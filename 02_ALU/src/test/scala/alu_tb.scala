@@ -51,6 +51,13 @@ class ALUAddTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.aluResult.expect(0.U)
       dut.clock.step(1)
 
+      // Large number addition with wraparound and extra addition
+      dut.io.operandA.poke("h80000000".U)
+      dut.io.operandB.poke("h80000001".U)
+      dut.io.operation.poke(ALUOp.ADD)
+      dut.io.aluResult.expect(1.U)
+      dut.clock.step(1)
+
       // Cross from positive to negative (signed interpretation)
       dut.io.operandA.poke("h7FFFFFFF".U)
       dut.io.operandB.poke(1.U)
