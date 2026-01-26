@@ -27,8 +27,25 @@ import chisel3._
 class MEM extends Module {
   val io = IO(new Bundle {
 
+    // Inputs from EX barrier
+    val aluRes    = Input(UInt(32.W))
+    val rd        = Input(UInt(5.W))
+    val regWrite  = Input(Bool())
+    val exception = Input(Bool())
+
+    // Outputs to MEM barrier
+    val aluResOut    = Output(UInt(32.W))
+    val rdOut        = Output(UInt(5.W))
+    val regWriteOut  = Output(Bool())
+    val exceptionOut = Output(Bool())
   })
 
-  // No memory operations implemented in Assignment03, nothing to do here! :)
-
+  // ------------------------------------------------------------
+  // Pass-through logic (no memory ops)
+  // ------------------------------------------------------------
+  io.aluResOut    := io.aluRes
+  io.rdOut        := io.rd
+  io.regWriteOut  := io.regWrite
+  io.exceptionOut := io.exception
 }
+

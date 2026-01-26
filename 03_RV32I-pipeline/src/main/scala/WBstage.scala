@@ -40,4 +40,29 @@ import chisel3._
 // Writeback Stage
 // -----------------------------------------
 
-//ToDo: Add your implementation according to the specification above here 
+class WB extends Module {
+  val io = IO(new Bundle {
+
+    // Inputs from MEM barrier
+    val aluRes    = Input(UInt(32.W))
+    val rd        = Input(UInt(5.W))
+    val regWrite  = Input(Bool())
+    val exception = Input(Bool())
+
+    // Outputs back to ID stage
+    val wbData   = Output(UInt(32.W))
+    val rdOut    = Output(UInt(5.W))
+    val regWriteOut = Output(Bool())
+
+    // Output to testbench
+    val exceptionOut = Output(Bool())
+  })
+
+  // ------------------------------------------------------------
+  // Writeback logic
+  // ------------------------------------------------------------
+  io.wbData       := io.aluRes
+  io.rdOut        := io.rd
+  io.regWriteOut  := io.regWrite
+  io.exceptionOut := io.exception
+}

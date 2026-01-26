@@ -1,9 +1,3 @@
-// ADS I Class Project
-// Pipelined RISC-V Core
-//
-// Chair of Electronic Design Automation, RPTU in Kaiserslautern
-// File created on 01/15/2023 by Tobias Jauch (@tojauch)
-
 /*
 The goal of this task is to implement a 5-stage pipeline that features a subset of RV32I (all R-type and I-type instructions). 
 
@@ -52,15 +46,104 @@ package core_tile
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
-import Assignment02.{ALU, ALUOp}
-import uopc._
 
+class PipelinedRV32Icore(BinaryFile: String) extends Module {
 
-class PipelinedRV32Icore (BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    //ToDo: Add I/O ports
+    val result    = Output(UInt(32.W))
+    val exception = Output(Bool())
   })
 
-//ToDo: Add your implementation according to the specification above here 
+  // ------------------------------------------------------------
+  // Instruction Memory
+  // ------------------------------------------------------------
+  val imem = Mem(4096, UInt(32.W))
+  loadMemoryFromFile(imem, BinaryFile)
 
+  // ------------------------------------------------------------
+  // Stage Instances
+  // ------------------------------------------------------------
+  val ifStage  = Module(new IF(BinaryFile))
+  val idStage  = Module(new ID)
+  val exStage  = Module(new EX)
+  val memStage = Module(new MEM)
+  val wbStage  = Module(new WB)
+
+  // ------------------------------------------------------------
+  // Pipeline Barriers
+  // ------------------------------------------------------------
+  val ifBarrier  = Module(new IFBarrier)
+  val idBarrier  = Module(new IDBarrier)
+  val exBarrier  = Module(new EXBarrier)
+  val memBarrier = Module(new MEMBarrier)
+
+  // outputs of one stage are input to the next stages
+
+  // ------------------------------------------------------------
+  // IF Stage
+  // ------------------------------------------------------------
+  ifStage.io.instr := imem(ifStage.io.pc >> 2.U)
+
+  // IF → IFBarrier
+  ifBarrier.io.inInstr := ifStage.io.instr
+
+  // ------------------------------------------------------------
+  // ID Stage
+  // ------------------------------------------------------------
+  idStage.io.instr := ifBarrier.io.outInstr
+  idStage.io.wbRegWrite := wbStage.io.regWrite
+  idStage.io.wbRd       := wbStage.io.rd
+  idStage.io.wbData     := wbStage.io.wbData
+
+
+  // ------------------------------------------------------------
+  // ID → IDBarrier
+  // ------------------------------------------------------------
+  idBarrier.io.inUOP         := idStage.io.aluOp
+  idBarrier.io.inRD          := idStage.io.rd
+  idBarrier.io.inOperandA    := idStage.io.opA
+  idBarrier.io.inOperandB    := idStage.io.opB
+  idBarrier.io.inXcptInvalid := idStage.io.exception
+
+
+  // ------------------------------------------------------------
+  // EX Stage
+  // ------------------------------------------------------------
+  exStage.io.uop         := idBarrier.io.outUOP
+  exStage.io.opA         := idBarrier.io.outOperandA
+  exStage.io.opB         := idBarrier.io.outOperandB
+  exStage.io.rd          := idBarrier.io.outRD
+  exStage.io.regWriteIn  := idBarrier.io.outRegWrite
+  exStage.io.exceptionIn := idBarrier.io.outXcptInvalid
+
+  // ------------------------------------------------------------
+  // EXBarrier → MEM
+  // ------------------------------------------------------------
+  memStage.io.aluRes    := exBarrier.io.outAluResult
+  memStage.io.rd        := exBarrier.io.outRD
+  memStage.io.regWrite  := exStage.io.regWrite
+  memStage.io.exception := exBarrier.io.outXcptInvalid
+
+  // ------------------------------------------------------------
+  // MEM → MEMBarrier regWrite is not propogated in this stage rather directly from EX to WB since this stage does nothing
+  // ------------------------------------------------------------  
+  memBarrier.io.inAluResult := memStage.io.aluResOut
+  memBarrier.io.inRD        := memStage.io.rdOut
+  memBarrier.io.inException := memStage.io.exceptionOut
+
+
+  // ------------------------------------------------------------
+  // WB Stage
+  // ------------------------------------------------------------
+  wbStage.io.aluRes    := memBarrier.io.outAluResult
+  wbStage.io.rd        := memBarrier.io.outRD
+  wbStage.io.regWrite  := exStage.io.regWrite
+  wbStage.io.exception := memBarrier.io.outException
+
+  // ------------------------------------------------------------
+  // Outputs to Testbench
+  // ------------------------------------------------------------
+  io.result    := wbStage.io.wbData
+  io.exception := wbStage.io.exception
 }
+

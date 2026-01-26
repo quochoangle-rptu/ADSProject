@@ -39,11 +39,26 @@ import chisel3.util.experimental.loadMemoryFromFile
 // Fetch Stage
 // -----------------------------------------
 
-class IF (BinaryFile: String) extends Module {
+class IF(BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    // ToDo: Add I/O ports
+    val instr = Output(UInt(32.W))  // fetched instruction
+    val pc    = Output(UInt(32.W))  // program counter
   })
 
-//ToDo: Add your implementation according to the specification above here 
-  
+  // ------------------------------------------------------------
+  // Program Counter initialized with 0
+  // ------------------------------------------------------------
+  val pcReg = RegInit(0.U(32.W))
+
+  // ------------------------------------------------------------
+  // PC update: always increment by 4
+  // ------------------------------------------------------------
+  pcReg := pcReg + 4.U
+
+  // ------------------------------------------------------------
+  // Outputs
+  // ------------------------------------------------------------
+  io.pc    := pcReg
+  io.instr := DontCare   // actual instruction is driven by core
 }
+
