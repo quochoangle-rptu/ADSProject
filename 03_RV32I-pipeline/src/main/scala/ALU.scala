@@ -1,4 +1,5 @@
 // ToDo: Add your ALU implementation from Assignment02 here
+package Assignment02
 
 import chisel3._
 import chisel3.util._
