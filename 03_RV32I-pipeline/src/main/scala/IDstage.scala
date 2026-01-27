@@ -39,7 +39,8 @@ package core_tile
 
 import chisel3._
 import chisel3.util._
-import uopc._
+//import uopc._
+import core_tile.uopc._ //bug since uopc is an object inside core_tile package
 
 // -----------------------------------------
 // Decode Stage
@@ -60,7 +61,8 @@ class ID extends Module {
     val opA      = Output(UInt(32.W))
     val opB      = Output(UInt(32.W))
     val imm      = Output(UInt(32.W))
-    val aluOp    = Output(UInt(UOP_WIDTH.W))
+    //val aluOp    = Output(UInt(UOP_WIDTH.W))
+    val aluOp    = Output(uopc())
     val rd       = Output(UInt(5.W))
     val regWrite = Output(Bool())
     val exception = Output(Bool())
@@ -79,16 +81,16 @@ class ID extends Module {
   // ------------------------------------------------------------
   // Register File
   // ------------------------------------------------------------
-  val regFile = Module(new RegisterFile)
+  val regFile = Module(new regFile)
 
   // Read ports
-  regFile.io.rs1 := rs1
-  regFile.io.rs2 := rs2
+  regFile.io.req_1.addr := rs1
+  regFile.io.req_2.addr := rs2
 
-  // Writeback port
-  regFile.io.wen := io.wbRegWrite
-  regFile.io.rd  := io.wbRd
-  regFile.io.wd  := io.wbData
+  // Writeback
+  regFile.io.req_3.wr_en := io.wbRegWrite
+  regFile.io.req_3.addr  := io.wbRd
+  regFile.io.req_3.data  := io.wbData
 
   // ------------------------------------------------------------
   // Immediate generation (I-type)
@@ -98,12 +100,12 @@ class ID extends Module {
   // ------------------------------------------------------------
   // Defaults
   // ------------------------------------------------------------
-  io.opA       := regFile.io.rs1Data
-  io.opB       := regFile.io.rs2Data
+  io.opA       := regFile.io.resp_1.data
+  io.opB       := regFile.io.resp_2.data
   io.imm       := immI
   io.rd        := rd
   io.regWrite  := false.B
-  io.aluOp     := UOP_NOP
+  io.aluOp     := uopc.NOP
   io.exception := false.B
 
   // ------------------------------------------------------------
@@ -116,22 +118,19 @@ class ID extends Module {
     // -------------------------
     is("b0110011".U) {
       io.regWrite := true.B
-      io.opB      := regFile.io.rs2Data
+      io.opB      := regFile.io.resp_2.data
 
       switch(Cat(funct7, funct3)) {
-        is("b0000000000".U) { io.aluOp := UOP_ADD }
-        is("b0100000000".U) { io.aluOp := UOP_SUB }
-        is("b0000000100".U) { io.aluOp := UOP_XOR }
-        is("b0000000110".U) { io.aluOp := UOP_OR  }
-        is("b0000000111".U) { io.aluOp := UOP_AND }
-        is("b0000000001".U) { io.aluOp := UOP_SLL }
-        is("b0000000101".U) { io.aluOp := UOP_SRL }
-        is("b0100000101".U) { io.aluOp := UOP_SRA }
-        is("b0000000010".U) { io.aluOp := UOP_SLT }
-        is("b0000000011".U) { io.aluOp := UOP_SLTU }
-        otherwise {
-          io.exception := true.B
-        }
+        is("b0000000000".U) { io.aluOp := uopc.ADD }
+        is("b0100000000".U) { io.aluOp := uopc.SUB }
+        is("b0000000100".U) { io.aluOp := uopc.XOR }
+        is("b0000000110".U) { io.aluOp := uopc.OR  }
+        is("b0000000111".U) { io.aluOp := uopc.AND }
+        is("b0000000001".U) { io.aluOp := uopc.SLL }
+        is("b0000000101".U) { io.aluOp := uopc.SRL }
+        is("b0100000101".U) { io.aluOp := uopc.SRA }
+        is("b0000000010".U) { io.aluOp := uopc.SLT }
+        is("b0000000011".U) { io.aluOp := uopc.SLTU }
       }
     }
 
@@ -143,29 +142,19 @@ class ID extends Module {
       io.opB      := immI
 
       switch(funct3) {
-        is("b000".U) { io.aluOp := UOP_ADD }   // ADDI
-        is("b100".U) { io.aluOp := UOP_XOR }   // XORI
-        is("b110".U) { io.aluOp := UOP_OR  }   // ORI
-        is("b111".U) { io.aluOp := UOP_AND }   // ANDI
-        is("b010".U) { io.aluOp := UOP_SLT }   // SLTI
-        is("b011".U) { io.aluOp := UOP_SLTU }  // SLTIU
-        is("b001".U) { io.aluOp := UOP_SLL }   // SLLI
+        is("b000".U) { io.aluOp := uopc.ADD }   // ADDI
+        is("b100".U) { io.aluOp := uopc.XOR }   // XORI
+        is("b110".U) { io.aluOp := uopc.OR  }   // ORI
+        is("b111".U) { io.aluOp := uopc.AND }   // ANDI
+        is("b010".U) { io.aluOp := uopc.SLT }   // SLTI
+        is("b011".U) { io.aluOp := uopc.SLTU }  // SLTIU
+        is("b001".U) { io.aluOp := uopc.SLL }   // SLLI
         is("b101".U) {
-          when(funct7 === "b0000000".U) { io.aluOp := UOP_SRL }
-          .elsewhen(funct7 === "b0100000".U) { io.aluOp := UOP_SRA }
+          when(funct7 === "b0000000".U) { io.aluOp := uopc.SRL }
+          .elsewhen(funct7 === "b0100000".U) { io.aluOp := uopc.SRA }
           .otherwise { io.exception := true.B }
         }
-        otherwise {
-          io.exception := true.B
-        }
       }
-    }
-
-    // -------------------------
-    // Unsupported instruction
-    // -------------------------
-    otherwise {
-      io.exception := true.B
     }
   }
 }

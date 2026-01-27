@@ -41,11 +41,13 @@ class MEMBarrier extends Module {
     val inAluResult = Input(UInt(32.W))
     val inRD        = Input(UInt(5.W))
     val inException = Input(Bool())
+    val inRegWrite = Input(Bool())
 
     // Outputs to WB stage
     val outAluResult = Output(UInt(32.W))
     val outRD        = Output(UInt(5.W))
     val outException = Output(Bool())
+    val outRegWrite = Output(Bool())
   })
 
   // ------------------------------------------------------------
@@ -54,6 +56,7 @@ class MEMBarrier extends Module {
   val aluResReg = RegInit(0.U(32.W))
   val rdReg     = RegInit(0.U(5.W))
   val excReg    = RegInit(false.B)
+  val regWriteReg = RegInit(false.B)
 
   // ------------------------------------------------------------
   // Latch inputs
@@ -61,6 +64,7 @@ class MEMBarrier extends Module {
   aluResReg := io.inAluResult
   rdReg     := io.inRD
   excReg    := io.inException
+  regWriteReg := io.inRegWrite
 
   // ------------------------------------------------------------
   // Drive outputs
@@ -68,5 +72,6 @@ class MEMBarrier extends Module {
   io.outAluResult := aluResReg
   io.outRD        := rdReg
   io.outException := excReg
+  io.outRegWrite := regWriteReg
 }
 

@@ -28,7 +28,7 @@ package core_tile
 import chisel3._
 import chisel3.util._
 import Assignment02.{ALU, ALUOp}
-import uopc._
+import core_tile.uopc._
 
 // -----------------------------------------
 // Execute Stage
@@ -38,7 +38,7 @@ class EX extends Module {
   val io = IO(new Bundle {
 
     // Inputs from ID barrier
-    val uop         = Input(UInt(UOP_WIDTH.W))
+    val uop         = Input(uopc())
     val opA         = Input(UInt(32.W))
     val opB         = Input(UInt(32.W))
     val rd          = Input(UInt(5.W))
@@ -68,7 +68,7 @@ class EX extends Module {
   // ------------------------------------------------------------
   // uop → ALUOp mapping
   // ------------------------------------------------------------
-  switch(io.uop) {
+  /*switch(io.uop) {
     is(UOP_ADD)  { alu.io.operation := ALUOp.ADD  }
     is(UOP_SUB)  { alu.io.operation := ALUOp.SUB  }
     is(UOP_AND)  { alu.io.operation := ALUOp.AND  }
@@ -79,7 +79,24 @@ class EX extends Module {
     is(UOP_SRA)  { alu.io.operation := ALUOp.SRA  }
     is(UOP_SLT)  { alu.io.operation := ALUOp.SLT  }
     is(UOP_SLTU) { alu.io.operation := ALUOp.SLTU }
+  }*/
+
+  switch(io.uop) {
+  is(uopc.ADD)   { alu.io.operation := ALUOp.ADD   }
+  is(uopc.SUB)   { alu.io.operation := ALUOp.SUB   }
+  is(uopc.AND)   { alu.io.operation := ALUOp.AND   }
+  is(uopc.OR)    { alu.io.operation := ALUOp.OR    }
+  is(uopc.XOR)   { alu.io.operation := ALUOp.XOR   }
+  is(uopc.SLL)   { alu.io.operation := ALUOp.SLL   }
+  is(uopc.SRL)   { alu.io.operation := ALUOp.SRL   }
+  is(uopc.SRA)   { alu.io.operation := ALUOp.SRA   }
+  is(uopc.SLT)   { alu.io.operation := ALUOp.SLT   }
+  is(uopc.SLTU)  { alu.io.operation := ALUOp.SLTU  }
+
+  // NOP or default behavior
+  is(uopc.NOP)   { alu.io.operation := ALUOp.ADD }
   }
+
 
   // ------------------------------------------------------------
   // Outputs

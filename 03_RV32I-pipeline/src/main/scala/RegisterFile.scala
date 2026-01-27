@@ -7,51 +7,68 @@
 package core_tile
 
 import chisel3._
+import chisel3.util._
 
-/*
-Register File Module: 32x32-bit dual-read single-write register file
+// -----------------------------------------
+// Register File Bundles
+// -----------------------------------------
 
-Memory:
-    regFile: Register file according to the RISC-V 32I specification
+class regFileReadReq extends Bundle {
+  val addr = UInt(5.W)
+}
 
-Ports:
-    req_1, resp_1: first read port
-        req_1.addr: read address for register x[0-31]
-        resp_1.data: register data output
-    req_2, resp_2: second read port
-        req_2.addr: read address for register x[0-31]
-        resp_2.data: register data output
-    req_3: write port
-        req_3.addr: write destination address
-        req_3.data: data to write
-        req_3.wr_en: write enable signal
+class regFileReadResp extends Bundle {
+  val data = UInt(32.W)
+}
 
-Functionality:
-    Two read ports allow simultaneous reading of two operands
-    Synchronous write updates register if wr_en is asserted
-*/
+class regFileWriteReq extends Bundle {
+  val addr  = UInt(5.W)
+  val data  = UInt(32.W)
+  val wr_en = Bool()
+}
 
 // -----------------------------------------
 // Register File
 // -----------------------------------------
 
-class regFileReadReq extends Bundle {
-    //ToDo: implement bundle for read request
-}
-
-class regFileReadResp extends Bundle {
-    //ToDo: implement bundle for read response
-}
-
-class regFileWriteReq extends Bundle {
-    //ToDo: implement bundle for write request
-}
-
 class regFile extends Module {
   val io = IO(new Bundle {
-    //ToDo: Add I/O ports 
-})
+    // Read port 1
+    val req_1  = Input(new regFileReadReq)
+    val resp_1 = Output(new regFileReadResp)
 
-//ToDo: Add your implementation according to the specification above here 
+    // Read port 2
+    val req_2  = Input(new regFileReadReq)
+    val resp_2 = Output(new regFileReadResp)
 
+    // Write port
+    val req_3  = Input(new regFileWriteReq)
+  })
+
+  // 32 registers of 32 bits each
+  val regs = RegInit(VecInit(Seq.fill(32)(0.U(32.W))))
+
+  // -------------------------
+  // Read logic (combinational)
+  // -------------------------
+
+  io.resp_1.data := Mux(
+    io.req_1.addr === 0.U,
+    0.U,
+    regs(io.req_1.addr)
+  )
+
+  io.resp_2.data := Mux(
+    io.req_2.addr === 0.U,
+    0.U,
+    regs(io.req_2.addr)
+  )
+
+  // -------------------------
+  // Write logic (synchronous)
+  // -------------------------
+
+  when(io.req_3.wr_en && (io.req_3.addr =/= 0.U)) {
+    regs(io.req_3.addr) := io.req_3.data
+  }
 }

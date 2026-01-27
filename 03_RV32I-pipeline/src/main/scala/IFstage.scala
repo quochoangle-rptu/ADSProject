@@ -49,16 +49,22 @@ class IF(BinaryFile: String) extends Module {
   // Program Counter initialized with 0
   // ------------------------------------------------------------
   val pcReg = RegInit(0.U(32.W))
+  val instrReg = RegInit(0.U(32.W))
+
+  // Fetch instruction using current PC
+  //instrReg := imem(pcReg >> 2)
 
   // ------------------------------------------------------------
   // PC update: always increment by 4
   // ------------------------------------------------------------
   pcReg := pcReg + 4.U
 
+  val imem = Mem(4096, UInt(32.W))
+  loadMemoryFromFile(imem, BinaryFile)
   // ------------------------------------------------------------
   // Outputs
   // ------------------------------------------------------------
   io.pc    := pcReg
-  io.instr := DontCare   // actual instruction is driven by core
+  io.instr := imem(pcReg >> 2)
 }
 

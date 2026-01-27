@@ -55,12 +55,6 @@ class PipelinedRV32Icore(BinaryFile: String) extends Module {
   })
 
   // ------------------------------------------------------------
-  // Instruction Memory
-  // ------------------------------------------------------------
-  val imem = Mem(4096, UInt(32.W))
-  loadMemoryFromFile(imem, BinaryFile)
-
-  // ------------------------------------------------------------
   // Stage Instances
   // ------------------------------------------------------------
   val ifStage  = Module(new IF(BinaryFile))
@@ -76,13 +70,27 @@ class PipelinedRV32Icore(BinaryFile: String) extends Module {
   val idBarrier  = Module(new IDBarrier)
   val exBarrier  = Module(new EXBarrier)
   val memBarrier = Module(new MEMBarrier)
+  
+  
+  // ------------------------------------------------------------
+  // Pipeline valid shift register (5-stage pipeline)
+  // ------------------------------------------------------------
+  //val validPipe = RegInit(VecInit(Seq.fill(5)(false.B)))
 
-  // outputs of one stage are input to the next stages
+  //validPipe(0) := true.B
+  //for (i <- 1 until 5) {
+  //  validPipe(i) := validPipe(i-1)
+  //}
+
+  //val wbValid = validPipe(4)
+  
+  // ***************************************************
+  // outputs of one stage are input to the next stages, outputs are driven to inputs within the individual modules.
 
   // ------------------------------------------------------------
   // IF Stage
   // ------------------------------------------------------------
-  ifStage.io.instr := imem(ifStage.io.pc >> 2.U)
+  //ifStage.io.instr := imem(ifStage.io.pc >> 2.U)
 
   // IF → IFBarrier
   ifBarrier.io.inInstr := ifStage.io.instr
@@ -104,6 +112,7 @@ class PipelinedRV32Icore(BinaryFile: String) extends Module {
   idBarrier.io.inOperandA    := idStage.io.opA
   idBarrier.io.inOperandB    := idStage.io.opB
   idBarrier.io.inXcptInvalid := idStage.io.exception
+  idBarrier.io.inRegWrite    := idStage.io.regWrite
 
 
   // ------------------------------------------------------------
@@ -117,12 +126,21 @@ class PipelinedRV32Icore(BinaryFile: String) extends Module {
   exStage.io.exceptionIn := idBarrier.io.outXcptInvalid
 
   // ------------------------------------------------------------
+  // EX → EXBarrier
+  // ------------------------------------------------------------
+  exBarrier.io.inAluResult   := exStage.io.aluRes
+  exBarrier.io.inRD          := exStage.io.rdOut
+  exBarrier.io.inRegWrite    := exStage.io.regWrite
+  exBarrier.io.inXcptInvalid := exStage.io.exception
+
+  // ------------------------------------------------------------
   // EXBarrier → MEM
   // ------------------------------------------------------------
   memStage.io.aluRes    := exBarrier.io.outAluResult
   memStage.io.rd        := exBarrier.io.outRD
-  memStage.io.regWrite  := exStage.io.regWrite
+  memStage.io.regWrite  := exBarrier.io.outRegWrite
   memStage.io.exception := exBarrier.io.outXcptInvalid
+
 
   // ------------------------------------------------------------
   // MEM → MEMBarrier regWrite is not propogated in this stage rather directly from EX to WB since this stage does nothing
@@ -130,20 +148,22 @@ class PipelinedRV32Icore(BinaryFile: String) extends Module {
   memBarrier.io.inAluResult := memStage.io.aluResOut
   memBarrier.io.inRD        := memStage.io.rdOut
   memBarrier.io.inException := memStage.io.exceptionOut
-
+  memBarrier.io.inRegWrite  := memStage.io.regWriteOut
 
   // ------------------------------------------------------------
-  // WB Stage
+  // MemBarrier --> WB Stage
   // ------------------------------------------------------------
   wbStage.io.aluRes    := memBarrier.io.outAluResult
   wbStage.io.rd        := memBarrier.io.outRD
-  wbStage.io.regWrite  := exStage.io.regWrite
+  wbStage.io.regWrite  := memBarrier.io.outRegWrite
   wbStage.io.exception := memBarrier.io.outException
+
 
   // ------------------------------------------------------------
   // Outputs to Testbench
   // ------------------------------------------------------------
   io.result    := wbStage.io.wbData
+  //io.result := Mux(wbValid, wbStage.io.wbData, 0.U)
   io.exception := wbStage.io.exception
 }
 

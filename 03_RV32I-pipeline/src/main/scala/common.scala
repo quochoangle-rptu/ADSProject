@@ -23,8 +23,16 @@ package core_tile
 import chisel3._
 import chisel3.experimental.ChiselEnum
 
-// -----------------------------------------
-// Global Definitions and Data Types
-// -----------------------------------------
-
-//ToDo: Add your implementation according to the specification above here 
+object uopc extends ChiselEnum {
+  val NOP = Value
+  val ADD = Value
+  val SUB = Value
+  val AND = Value
+  val OR  = Value
+  val XOR = Value
+  val SLL = Value
+  val SRL = Value
+  val SRA = Value
+  val SLT = Value
+  val SLTU = Value
+}
