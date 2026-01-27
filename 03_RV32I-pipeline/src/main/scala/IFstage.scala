@@ -33,38 +33,30 @@ Outputs:
 package core_tile
 
 import chisel3._
+import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
-
-// -----------------------------------------
-// Fetch Stage
-// -----------------------------------------
 
 class IF(BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    val instr = Output(UInt(32.W))  // fetched instruction
-    val pc    = Output(UInt(32.W))  // program counter
+    val instr = Output(UInt(32.W))
+    val pc    = Output(UInt(32.W))
   })
 
-  // ------------------------------------------------------------
-  // Program Counter initialized with 0
-  // ------------------------------------------------------------
-  val pcReg = RegInit(0.U(32.W))
+  val pcReg    = RegInit(0.U(32.W))
   val instrReg = RegInit(0.U(32.W))
 
-  // Fetch instruction using current PC
-  //instrReg := imem(pcReg >> 2)
-
-  // ------------------------------------------------------------
-  // PC update: always increment by 4
-  // ------------------------------------------------------------
-  pcReg := pcReg + 4.U
-
+  // Combinational instruction memory
   val imem = Mem(4096, UInt(32.W))
   loadMemoryFromFile(imem, BinaryFile)
-  // ------------------------------------------------------------
-  // Outputs
-  // ------------------------------------------------------------
+
+  // Fetch instruction combinationally, register it
+  instrReg := imem(pcReg >> 2)
+
+  // Update PC
+  pcReg := pcReg + 4.U
+
   io.pc    := pcReg
-  io.instr := imem(pcReg >> 2)
+  io.instr := instrReg
 }
+
 
