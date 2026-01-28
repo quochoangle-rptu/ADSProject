@@ -104,7 +104,54 @@ class PipelinedRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.result.expect(1.U)     // SLTU x13, x5, x4
       dut.io.exception.expect(false.B)
-      dut.clock.step(1)           
+
+      //----------------------------------------------------------
+      //Corner Cases 
+      //----------------------------------------------------------
+      dut.clock.step(1)
+      dut.io.result.expect(1.U)     //00100013: ADDI x0, x0, 1 (WB result)
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFFF".U) //fff00193 ADDI x3, x0, -1
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+      // SLT x4, x3, x4  (-1 < 1) → 1
+      dut.clock.step(1)
+      dut.io.result.expect(1.U)
+      dut.io.exception.expect(false.B)
+
+      // SLTU x5, x3, x4  (unsigned) → 0
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)
+      dut.io.exception.expect(false.B)
+
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
+      dut.io.exception.expect(false.B)
+
+      // SLL x6, x4, x0  (shift by 0)
+      dut.clock.step(1)
+      dut.io.result.expect(1.U)
+      dut.io.exception.expect(false.B)
+
+      //01f213b3  SLL x7, x4, x31  (shift by 31)
+      dut.clock.step(1)
+      dut.io.result.expect("h80000000".U)
+      dut.io.exception.expect(false.B)
     }
   }
 }
