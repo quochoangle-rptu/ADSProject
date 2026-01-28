@@ -1,30 +1,106 @@
-00000013 // ADDI x0, x0, 0
-00400093 // ADDI x1, x0, 4
-00500113 // ADDI x2, x0, 5
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-002081b3 // ADD x3, x1, x2
-7ff00213 // ADDI x4, x0, 2047
-01000293 // ADDI x5, x0, 16
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-40520333 // SUB x6, x4, x5
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-00000013 // ADDI x0, x0, 0
-003343b3 // XOR x7, x6, x3
-00536433 // OR x8, x6, x5
-005374b3 // AND x9, x6, x5
-00000013 // ADDI x0, x0, 0
-00239533 // SLL x10, x7, x2
-0023d5b3 // SRL x11, x7, x2
-4023d633 // SRA x12, x7, x2
-004226b3 // SLT x13, x4, x4
-005226b3 // SLT x13, x4, x5
-0042a6b3 // SLT x13, x5, x4
-004236b3 // SLTU x13, x4, x4
-005236b3 // SLTU x13, x4, x5
-0042b6b3 // SLTU x13, x5, x4
-021141b3 // DIV x3, x2, x1 (NOT IMPLEMENTED!)
+00000013 // NOP: ADDI x0, x0, 0                  -> Result: 0
+00400093 // ADDI x1, x0, 4                       -> x1 = 4
+00500113 // ADDI x2, x0, 5                       -> x2 = 5
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+002081b3 // ADD x3, x1, x2                       -> x3 = 9
+7ff00213 // ADDI x4, x0, 2047                    -> x4 = 2047 (0x7FF)
+01000293 // ADDI x5, x0, 16                      -> x5 = 16
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+40520333 // SUB x6, x4, x5                       -> x6 = 2031 (0x7EF)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+003343b3 // XOR x7, x6, x3                       -> x7 = 2022 (0x7E6)
+00536433 // OR x8, x6, x5                        -> x8 = 2047 (0x7FF)
+005374b3 // AND x9, x6, x5                       -> x9 = 0
+00000013 // NOP
+00239533 // SLL x10, x7, x2                      -> x10 = 64704 (2022 << 5)
+0023d5b3 // SRL x11, x7, x2                      -> x11 = 63 (2022 >> 5)
+4023d633 // SRA x12, x7, x2                      -> x12 = 63 (positive num, same as SRL)
+004226b3 // SLT x13, x4, x4                      -> x13 = 0 (2047 < 2047 = false)
+005226b3 // SLT x13, x4, x5                      -> x13 = 0 (2047 < 16 = false)
+0042a6b3 // SLT x13, x5, x4                      -> x13 = 1 (16 < 2047 = true)
+004236b3 // SLTU x13, x4, x4                     -> x13 = 0
+005236b3 // SLTU x13, x4, x5                     -> x13 = 0
+0042b6b3 // SLTU x13, x5, x4                     -> x13 = 1
+00100013 // ADDI x0, x0, 1                       -> x0 = 0 (hardwired), WB shows 1
+fff00193 // ADDI x3, x0, -1                      -> x3 = 0xFFFFFFFF (-1)
+00000013 // NOP (wait for x3 to be written)
+00000013 // NOP
+00000013 // NOP
+0041a233 // SLT x4, x3, x4                       -> x4 = 1 (-1 < prev_x4 signed)
+         //                                         Note: prev x4=2047, -1 < 2047 = true
+0041b2b3 // SLTU x5, x3, x4                      -> x5 = 0 (0xFFFFFFFF > 1 unsigned)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+00021333 // SLL x6, x4, x0                       -> x6 = x4 (shift by 0 = no change)
+         //                                         x4 = 1 from previous SLT
+01f21393 // SLLI x7, x4, 31                      -> x7 = 0x80000000 (1 << 31)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+7ff04413 // XORI x8, x0, 2047                    -> x8 = 2047 (0x7FF, max positive imm)
+80004493 // XORI x9, x0, -2048                   -> x9 = 0xFFFFF800 (-2048 sign-extended)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+00946533 // OR x10, x8, x9                       -> x10 = 0x7FF | 0xFFFFF800 = 0xFFFFFFFF
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+fff44613 // XORI x12, x8, -1                     -> x12 = 2047 XOR 0xFFFFFFFF = 0xFFFFF800
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+fff00713 // ADDI x14, x0, -1                     -> x14 = 0xFFFFFFFF
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+41f75793 // SRAI x15, x14, 31                    -> x15 = 0xFFFFFFFF (sign extended)
+         //                                         SRA of -1 by any amount = -1
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+01f79813 // SLLI x16, x15, 31                    -> x16 = 0x80000000 (0xFFFFFFFF << 31)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+01f7d893 // SRLI x17, x15, 31                    -> x17 = 1 (0xFFFFFFFF >> 31 logical)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+00e7c933 // SLT x18, x15, x14                    -> x18 = 0 (x15 = x14 = -1, not less than)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+7ff00993 // ADDI x19, x0, 2047                   -> x19 = 2047
+80000a13 // LUI-style not available, use:
+         // Actually we can't do 0x80000000 directly with ADDI
+         // Let's do: ADDI x20, x0, -2048 then shift
+         // Changed to: XORI x20, x0, -2048       -> x20 = 0xFFFFF800
+         // Wait, that's not 0x80000000
+         // Let's use: We'll test SUB instead
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+414a0a33 // SUB x20, x20, x20                    -> x20 = 0 (any - self = 0)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+00000ab3 // ADD x21, x0, x0                      -> x21 = 0
+00100b13 // ADDI x22, x0, 1                      -> x22 = 1
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+fffb0b93 // ADDI x23, x22, -1                    -> x23 = 0 (1 + (-1) = 0)
+00000013 // NOP
+00000013 // NOP
+00000013 // NOP
+017b8c33 // ADD x24, x23, x23                    -> x24 = 0 (0 + 0 = 0)
+         // We'd need more setup for proper wraparound test
+00000013 // NOP (end marker)
