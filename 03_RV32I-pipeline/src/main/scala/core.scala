@@ -1,9 +1,3 @@
-// ADS I Class Project
-// Pipelined RISC-V Core
-//
-// Chair of Electronic Design Automation, RPTU in Kaiserslautern
-// File created on 01/15/2023 by Tobias Jauch (@tojauch)
-
 /*
 The goal of this task is to implement a 5-stage pipeline that features a subset of RV32I (all R-type and I-type instructions). 
 
@@ -52,15 +46,124 @@ package core_tile
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
-import Assignment02.{ALU, ALUOp}
-import uopc._
 
+class PipelinedRV32Icore(BinaryFile: String) extends Module {
 
-class PipelinedRV32Icore (BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    //ToDo: Add I/O ports
+    val result    = Output(UInt(32.W))
+    val exception = Output(Bool())
   })
 
-//ToDo: Add your implementation according to the specification above here 
+  // ------------------------------------------------------------
+  // Stage Instances
+  // ------------------------------------------------------------
+  val ifStage  = Module(new IF(BinaryFile))
+  val idStage  = Module(new ID)
+  val exStage  = Module(new EX)
+  val memStage = Module(new MEM)
+  val wbStage  = Module(new WB)
 
+  // ------------------------------------------------------------
+  // Pipeline Barriers
+  // ------------------------------------------------------------
+  val ifBarrier  = Module(new IFBarrier)
+  val idBarrier  = Module(new IDBarrier)
+  val exBarrier  = Module(new EXBarrier)
+  val memBarrier = Module(new MEMBarrier)
+  
+  
+  // ------------------------------------------------------------
+  // Pipeline valid shift register (5-stage pipeline)
+  // ------------------------------------------------------------
+  //val validPipe = RegInit(VecInit(Seq.fill(5)(false.B)))
+
+  //validPipe(0) := true.B
+  //for (i <- 1 until 5) {
+  //  validPipe(i) := validPipe(i-1)
+  //}
+
+  //val wbValid = validPipe(4)
+  
+  // ***************************************************
+  // outputs of one stage are input to the next stages, outputs are driven to inputs within the individual modules.
+
+  // ------------------------------------------------------------
+  // IF Stage
+  // ------------------------------------------------------------
+  //ifStage.io.instr := imem(ifStage.io.pc >> 2.U)
+
+  // IF → IFBarrier
+  ifBarrier.io.inInstr := ifStage.io.instr
+
+  // ------------------------------------------------------------
+  // ID Stage
+  // ------------------------------------------------------------
+  idStage.io.instr := ifBarrier.io.outInstr
+  idStage.io.wbRegWrite := wbStage.io.regWrite
+  idStage.io.wbRd       := wbStage.io.rd
+  idStage.io.wbData     := wbStage.io.wbData
+
+
+  // ------------------------------------------------------------
+  // ID → IDBarrier
+  // ------------------------------------------------------------
+  idBarrier.io.inUOP         := idStage.io.aluOp
+  idBarrier.io.inRD          := idStage.io.rd
+  idBarrier.io.inOperandA    := idStage.io.opA
+  idBarrier.io.inOperandB    := idStage.io.opB
+  idBarrier.io.inXcptInvalid := idStage.io.exception
+  idBarrier.io.inRegWrite    := idStage.io.regWrite
+
+
+  // ------------------------------------------------------------
+  // EX Stage
+  // ------------------------------------------------------------
+  exStage.io.uop         := idBarrier.io.outUOP
+  exStage.io.opA         := idBarrier.io.outOperandA
+  exStage.io.opB         := idBarrier.io.outOperandB
+  exStage.io.rd          := idBarrier.io.outRD
+  exStage.io.regWriteIn  := idBarrier.io.outRegWrite
+  exStage.io.exceptionIn := idBarrier.io.outXcptInvalid
+
+  // ------------------------------------------------------------
+  // EX → EXBarrier
+  // ------------------------------------------------------------
+  exBarrier.io.inAluResult   := exStage.io.aluRes
+  exBarrier.io.inRD          := exStage.io.rdOut
+  exBarrier.io.inRegWrite    := exStage.io.regWrite
+  exBarrier.io.inXcptInvalid := exStage.io.exception
+
+  // ------------------------------------------------------------
+  // EXBarrier → MEM
+  // ------------------------------------------------------------
+  memStage.io.aluRes    := exBarrier.io.outAluResult
+  memStage.io.rd        := exBarrier.io.outRD
+  memStage.io.regWrite  := exBarrier.io.outRegWrite
+  memStage.io.exception := exBarrier.io.outXcptInvalid
+
+
+  // ------------------------------------------------------------
+  // MEM → MEMBarrier regWrite is not propogated in this stage rather directly from EX to WB since this stage does nothing
+  // ------------------------------------------------------------  
+  memBarrier.io.inAluResult := memStage.io.aluResOut
+  memBarrier.io.inRD        := memStage.io.rdOut
+  memBarrier.io.inException := memStage.io.exceptionOut
+  memBarrier.io.inRegWrite  := memStage.io.regWriteOut
+
+  // ------------------------------------------------------------
+  // MemBarrier --> WB Stage
+  // ------------------------------------------------------------
+  wbStage.io.aluRes    := memBarrier.io.outAluResult
+  wbStage.io.rd        := memBarrier.io.outRD
+  wbStage.io.regWrite  := memBarrier.io.outRegWrite
+  wbStage.io.exception := memBarrier.io.outException
+
+
+  // ------------------------------------------------------------
+  // Outputs to Testbench
+  // ------------------------------------------------------------
+  io.result    := wbStage.io.wbData
+  //io.result := Mux(wbValid, wbStage.io.wbData, 0.U)
+  io.exception := wbStage.io.exception
 }
+

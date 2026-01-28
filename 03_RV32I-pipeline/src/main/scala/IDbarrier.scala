@@ -33,10 +33,60 @@ Functionality:
 package core_tile
 
 import chisel3._
-import uopc._
+//import uopc._
+import core_tile.uopc._
 
 // -----------------------------------------
 // ID-Barrier
 // -----------------------------------------
 
-//ToDo: Add your implementation according to the specification above here 
+class IDBarrier extends Module {
+  val io = IO(new Bundle {
+
+    // Inputs from ID stage
+    val inUOP          = Input(uopc())
+    val inRD           = Input(UInt(5.W))
+    val inOperandA     = Input(UInt(32.W))
+    val inOperandB     = Input(UInt(32.W))
+    val inXcptInvalid  = Input(Bool())
+    val inRegWrite     = Input(Bool())
+
+    // Outputs to EX stage
+    val outUOP         = Output(uopc())
+    val outRD          = Output(UInt(5.W))
+    val outOperandA    = Output(UInt(32.W))
+    val outOperandB    = Output(UInt(32.W))
+    val outXcptInvalid = Output(Bool())
+    val outRegWrite    = Output(Bool())
+  })
+
+  // ------------------------------------------------------------
+  // Pipeline registers
+  // ------------------------------------------------------------
+  val uopReg      = RegInit(uopc.NOP)
+  val rdReg       = RegInit(0.U(5.W))
+  val opAReg      = RegInit(0.U(32.W))
+  val opBReg      = RegInit(0.U(32.W))
+  val xcptReg     = RegInit(false.B)
+  val regWriteReg = RegInit(false.B)
+
+  // ------------------------------------------------------------
+  // Latch inputs
+  // ------------------------------------------------------------
+  uopReg  := io.inUOP
+  rdReg   := io.inRD
+  opAReg  := io.inOperandA
+  opBReg  := io.inOperandB
+  xcptReg := io.inXcptInvalid
+  regWriteReg := io.inRegWrite
+
+  // ------------------------------------------------------------
+  // Drive outputs
+  // ------------------------------------------------------------
+  io.outUOP         := uopReg
+  io.outRD          := rdReg
+  io.outOperandA    := opAReg
+  io.outOperandB    := opBReg
+  io.outXcptInvalid := xcptReg
+  io.outRegWrite := regWriteReg
+}
