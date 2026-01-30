@@ -111,50 +111,64 @@ class ID extends Module {
   // ------------------------------------------------------------
   // Decode logic
   // ------------------------------------------------------------
-  switch(opcode) {
 
-    // -------------------------
-    // R-type instructions
-    // -------------------------
-    is("b0110011".U) {
-      io.regWrite := true.B
-      io.opB      := regFile.io.resp_2.data
+  // -------------------------
+  // R-type instructions
+  // -------------------------
+  when(opcode === "b0110011".U) {
+    io.regWrite := true.B
+    io.opB      := regFile.io.resp_2.data
 
-      switch(Cat(funct7, funct3)) {
-        is("b0000000000".U) { io.aluOp := uopc.ADD }
-        is("b0100000000".U) { io.aluOp := uopc.SUB }
-        is("b0000000100".U) { io.aluOp := uopc.XOR }
-        is("b0000000110".U) { io.aluOp := uopc.OR  }
-        is("b0000000111".U) { io.aluOp := uopc.AND }
-        is("b0000000001".U) { io.aluOp := uopc.SLL }
-        is("b0000000101".U) { io.aluOp := uopc.SRL }
-        is("b0100000101".U) { io.aluOp := uopc.SRA }
-        is("b0000000010".U) { io.aluOp := uopc.SLT }
-        is("b0000000011".U) { io.aluOp := uopc.SLTU }
+    when(Cat(funct7, funct3) === "b0000000000".U) { io.aluOp := uopc.ADD }
+    .elsewhen(Cat(funct7, funct3) === "b0100000000".U) { io.aluOp := uopc.SUB }
+    .elsewhen(Cat(funct7, funct3) === "b0000000100".U) { io.aluOp := uopc.XOR }
+    .elsewhen(Cat(funct7, funct3) === "b0000000110".U) { io.aluOp := uopc.OR  }
+    .elsewhen(Cat(funct7, funct3) === "b0000000111".U) { io.aluOp := uopc.AND }
+    .elsewhen(Cat(funct7, funct3) === "b0000000001".U) { io.aluOp := uopc.SLL }
+    .elsewhen(Cat(funct7, funct3) === "b0000000101".U) { io.aluOp := uopc.SRL }
+    .elsewhen(Cat(funct7, funct3) === "b0100000101".U) { io.aluOp := uopc.SRA }
+    .elsewhen(Cat(funct7, funct3) === "b0000000010".U) { io.aluOp := uopc.SLT }
+    .elsewhen(Cat(funct7, funct3) === "b0000000011".U) { io.aluOp := uopc.SLTU }
+    .otherwise {
+      io.exception := true.B
+      io.regWrite  := false.B
+      io.aluOp     := uopc.NOP
+    }
+  }
+
+  // -------------------------
+  // I-type ALU instructions
+  // -------------------------
+  .elsewhen(opcode === "b0010011".U) {
+    io.regWrite := true.B
+    io.opB      := immI
+
+    when(funct3 === "b000".U) { io.aluOp := uopc.ADD }   // ADDI
+    .elsewhen(funct3 === "b100".U) { io.aluOp := uopc.XOR }   // XORI
+    .elsewhen(funct3 === "b110".U) { io.aluOp := uopc.OR  }   // ORI
+    .elsewhen(funct3 === "b111".U) { io.aluOp := uopc.AND }   // ANDI
+    .elsewhen(funct3 === "b010".U) { io.aluOp := uopc.SLT }   // SLTI
+    .elsewhen(funct3 === "b011".U) { io.aluOp := uopc.SLTU }  // SLTIU
+    .elsewhen(funct3 === "b001".U) { io.aluOp := uopc.SLL }   // SLLI
+    .elsewhen(funct3 === "b101".U) {
+      when(funct7 === "b0000000".U) { io.aluOp := uopc.SRL }
+      .elsewhen(funct7 === "b0100000".U) { io.aluOp := uopc.SRA }
+      .otherwise { 
+        io.exception := true.B
+        io.regWrite  := false.B
+        io.aluOp     := uopc.NOP
       }
     }
-
-    // -------------------------
-    // I-type ALU instructions
-    // -------------------------
-    is("b0010011".U) {
-      io.regWrite := true.B
-      io.opB      := immI
-
-      switch(funct3) {
-        is("b000".U) { io.aluOp := uopc.ADD }   // ADDI
-        is("b100".U) { io.aluOp := uopc.XOR }   // XORI
-        is("b110".U) { io.aluOp := uopc.OR  }   // ORI
-        is("b111".U) { io.aluOp := uopc.AND }   // ANDI
-        is("b010".U) { io.aluOp := uopc.SLT }   // SLTI
-        is("b011".U) { io.aluOp := uopc.SLTU }  // SLTIU
-        is("b001".U) { io.aluOp := uopc.SLL }   // SLLI
-        is("b101".U) {
-          when(funct7 === "b0000000".U) { io.aluOp := uopc.SRL }
-          .elsewhen(funct7 === "b0100000".U) { io.aluOp := uopc.SRA }
-          .otherwise { io.exception := true.B }
-        }
-      }
+    .otherwise {
+      io.exception := true.B
+      io.regWrite  := false.B
+      io.aluOp     := uopc.NOP
     }
+  }
+
+  .otherwise {
+    io.exception := true.B
+    io.regWrite  := false.B
+    io.aluOp     := uopc.NOP
   }
 }
