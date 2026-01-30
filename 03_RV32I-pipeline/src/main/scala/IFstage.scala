@@ -42,7 +42,7 @@ class IF(BinaryFile: String) extends Module {
     val pc    = Output(UInt(32.W))
   })
 
-  val pcReg    = RegInit(0.U(32.W))
+  val pcReg    = RegInit(0.U(32.W)) // we initialize with 0
   val instrReg = RegInit(0.U(32.W))
 
   // Combinational instruction memory
@@ -53,9 +53,9 @@ class IF(BinaryFile: String) extends Module {
   instrReg := imem(pcReg >> 2)
 
   // Update PC
-  pcReg := pcReg + 4.U
+  pcReg := pcReg + 4.U //LHS and RHS = registers, so assignment in next CC
 
-  io.pc    := pcReg
+  io.pc    := pcReg //same cycle assignment
   io.instr := instrReg
 }
 

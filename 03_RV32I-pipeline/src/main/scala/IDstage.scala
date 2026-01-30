@@ -98,7 +98,7 @@ class ID extends Module {
   val immI = Cat(Fill(20, io.instr(31)), io.instr(31, 20))
 
   // ------------------------------------------------------------
-  // Defaults
+  // Defaults OUTPUTS of ID stage are fetched
   // ------------------------------------------------------------
   io.opA       := regFile.io.resp_1.data
   io.opB       := regFile.io.resp_2.data
@@ -131,6 +131,9 @@ class ID extends Module {
         is("b0100000101".U) { io.aluOp := uopc.SRA }
         is("b0000000010".U) { io.aluOp := uopc.SLT }
         is("b0000000011".U) { io.aluOp := uopc.SLTU }
+        //otherwise{
+          //io.exception := true.B
+        //}
       }
     }
 
@@ -154,7 +157,13 @@ class ID extends Module {
           .elsewhen(funct7 === "b0100000".U) { io.aluOp := uopc.SRA }
           .otherwise { io.exception := true.B }
         }
+        //otherwise {
+          //io.exception := true.B
+        //}
       }
     }
+    //otherwise {
+    // io.exception := true.B
+    //}
   }
 }
