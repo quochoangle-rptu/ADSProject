@@ -33,23 +33,19 @@ Functionality:
 package core_tile
 
 import chisel3._
-//import uopc._
-import core_tile.uopc._
+import uopc._
 
 // -----------------------------------------
 // ID-Barrier
 // -----------------------------------------
-
 class IDBarrier extends Module {
   val io = IO(new Bundle {
-
     // Inputs from ID stage
-    val inUOP          = Input(uopc())
-    val inRD           = Input(UInt(5.W))
-    val inOperandA     = Input(UInt(32.W))
-    val inOperandB     = Input(UInt(32.W))
-    val inXcptInvalid  = Input(Bool())
-    val inRegWrite     = Input(Bool())
+    val inUOP         = Input(uopc())
+    val inRD          = Input(UInt(5.W))
+    val inOperandA    = Input(UInt(32.W))
+    val inOperandB    = Input(UInt(32.W))
+    val inXcptInvalid = Input(Bool())
 
     // Outputs to EX stage
     val outUOP         = Output(uopc())
@@ -57,36 +53,27 @@ class IDBarrier extends Module {
     val outOperandA    = Output(UInt(32.W))
     val outOperandB    = Output(UInt(32.W))
     val outXcptInvalid = Output(Bool())
-    val outRegWrite    = Output(Bool())
   })
 
-  // ------------------------------------------------------------
   // Pipeline registers
-  // ------------------------------------------------------------
-  val uopReg      = RegInit(uopc.NOP)
+  val uopReg      = RegInit(NOP)
   val rdReg       = RegInit(0.U(5.W))
-  val opAReg      = RegInit(0.U(32.W))
-  val opBReg      = RegInit(0.U(32.W))
+  val operandAReg = RegInit(0.U(32.W))
+  val operandBReg = RegInit(0.U(32.W))
   val xcptReg     = RegInit(false.B)
-  val regWriteReg = RegInit(false.B)
 
-  // ------------------------------------------------------------
-  // Latch inputs
-  // ------------------------------------------------------------
-  uopReg  := io.inUOP
-  rdReg   := io.inRD
-  opAReg  := io.inOperandA
-  opBReg  := io.inOperandB
-  xcptReg := io.inXcptInvalid
-  regWriteReg := io.inRegWrite
+  // Capture inputs on clock edge
+  uopReg      := io.inUOP
+  rdReg       := io.inRD
+  operandAReg := io.inOperandA
+  operandBReg := io.inOperandB
+  xcptReg     := io.inXcptInvalid
 
-  // ------------------------------------------------------------
-  // Drive outputs
-  // ------------------------------------------------------------
+  // Output registered values
   io.outUOP         := uopReg
   io.outRD          := rdReg
-  io.outOperandA    := opAReg
-  io.outOperandB    := opBReg
+  io.outOperandA    := operandAReg
+  io.outOperandB    := operandBReg
   io.outXcptInvalid := xcptReg
-  io.outRegWrite := regWriteReg
 }
+//ToDo: Add your implementation according to the specification above here 

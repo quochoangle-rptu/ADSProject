@@ -31,5 +31,27 @@ import chisel3._
 // -----------------------------------------
 // WB-Barrier
 // -----------------------------------------
+class WBBarrier extends Module {
+  val io = IO(new Bundle {
+    // Inputs from WB stage and MEM barrier
+    val inCheckRes    = Input(UInt(32.W))
+    val inXcptInvalid = Input(Bool())
 
+    // Outputs for external observation
+    val outCheckRes    = Output(UInt(32.W))
+    val outXcptInvalid = Output(Bool())
+  })
+
+  // Pipeline registers
+  val checkResReg = RegInit(0.U(32.W))
+  val xcptReg     = RegInit(false.B)
+
+  // Capture inputs on clock edge
+  checkResReg := io.inCheckRes
+  xcptReg     := io.inXcptInvalid
+
+  // Output registered values
+  io.outCheckRes    := checkResReg
+  io.outXcptInvalid := xcptReg
+}
 //ToDo: Add your implementation according to the specification above here 

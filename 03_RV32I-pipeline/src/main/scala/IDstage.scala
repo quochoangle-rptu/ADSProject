@@ -39,38 +39,33 @@ package core_tile
 
 import chisel3._
 import chisel3.util._
-//import uopc._
-import core_tile.uopc._ //bug since uopc is an object inside core_tile package
+import uopc._
 
 // -----------------------------------------
 // Decode Stage
 // -----------------------------------------
-
 class ID extends Module {
   val io = IO(new Bundle {
-
     // Input from IF barrier
     val instr = Input(UInt(32.W))
 
-    // Writeback interface from WB stage
-    val wbRegWrite = Input(Bool())
-    val wbRd       = Input(UInt(5.W))
-    val wbData     = Input(UInt(32.W))
+    // Register file read interface (directly connect to external register file)
+    val regFileReq_A  = Output(new regFileReadReq)
+    val regFileResp_A = Input(new regFileReadResp)
+    val regFileReq_B  = Output(new regFileReadReq)
+    val regFileResp_B = Input(new regFileReadResp)
 
     // Outputs to ID barrier
-    val opA      = Output(UInt(32.W))
-    val opB      = Output(UInt(32.W))
-    val imm      = Output(UInt(32.W))
-    //val aluOp    = Output(UInt(UOP_WIDTH.W))
-    val aluOp    = Output(uopc())
-    val rd       = Output(UInt(5.W))
-    val regWrite = Output(Bool())
-    val exception = Output(Bool())
+    val uop         = Output(uopc())       // Micro-operation code
+    val rd          = Output(UInt(5.W))    // Destination register
+    val operandA    = Output(UInt(32.W))   // First operand (from rs1)
+    val operandB    = Output(UInt(32.W))   // Second operand (from rs2 or immediate)
+    val XcptInvalid = Output(Bool())       // Invalid instruction flag
   })
 
-  // ------------------------------------------------------------
-  // Instruction fields
-  // ------------------------------------------------------------
+  // =====================================================
+  // Extract instruction fields
+  // =====================================================
   val opcode = io.instr(6, 0)
   val rd     = io.instr(11, 7)
   val funct3 = io.instr(14, 12)
@@ -78,92 +73,122 @@ class ID extends Module {
   val rs2    = io.instr(24, 20)
   val funct7 = io.instr(31, 25)
 
-  // ------------------------------------------------------------
-  // Register File
-  // ------------------------------------------------------------
-  val regFile = Module(new regFile)
+  // I-type immediate: sign-extend bits [31:20]
+  val immI = io.instr(31, 20).asSInt.pad(32).asUInt
 
-  // Read ports
-  regFile.io.req_1.addr := rs1
-  regFile.io.req_2.addr := rs2
+  // =====================================================
+  // Request register file reads
+  // =====================================================
+  io.regFileReq_A.addr := rs1
+  io.regFileReq_B.addr := rs2
 
-  // Writeback
-  regFile.io.req_3.wr_en := io.wbRegWrite
-  regFile.io.req_3.addr  := io.wbRd
-  regFile.io.req_3.data  := io.wbData
+  // =====================================================
+  // Decode instruction and determine micro-op
+  // =====================================================
 
-  // ------------------------------------------------------------
-  // Immediate generation (I-type)
-  // ------------------------------------------------------------
-  val immI = Cat(Fill(20, io.instr(31)), io.instr(31, 20))
+  // Default values
+  io.uop := NOP
+  io.XcptInvalid := false.B
+  io.rd := rd
+  io.operandA := io.regFileResp_A.data  // Default: rs1 value
+  io.operandB := io.regFileResp_B.data  // Default: rs2 value (R-type)
 
-  // ------------------------------------------------------------
-  // Defaults OUTPUTS of ID stage are fetched
-  // ------------------------------------------------------------
-  io.opA       := regFile.io.resp_1.data
-  io.opB       := regFile.io.resp_2.data
-  io.imm       := immI
-  io.rd        := rd
-  io.regWrite  := false.B
-  io.aluOp     := uopc.NOP
-  io.exception := false.B
+  // R-type instructions (opcode = 0110011)
+  when(opcode === Opcodes.R_TYPE) {
+    io.operandB := io.regFileResp_B.data  // Use rs2 for R-type
 
-  // ------------------------------------------------------------
-  // Decode logic
-  // ------------------------------------------------------------
-  switch(opcode) {
-
-    // -------------------------
-    // R-type instructions
-    // -------------------------
-    is("b0110011".U) {
-      io.regWrite := true.B
-      io.opB      := regFile.io.resp_2.data
-
-      switch(Cat(funct7, funct3)) {
-        is("b0000000000".U) { io.aluOp := uopc.ADD }
-        is("b0100000000".U) { io.aluOp := uopc.SUB }
-        is("b0000000100".U) { io.aluOp := uopc.XOR }
-        is("b0000000110".U) { io.aluOp := uopc.OR  }
-        is("b0000000111".U) { io.aluOp := uopc.AND }
-        is("b0000000001".U) { io.aluOp := uopc.SLL }
-        is("b0000000101".U) { io.aluOp := uopc.SRL }
-        is("b0100000101".U) { io.aluOp := uopc.SRA }
-        is("b0000000010".U) { io.aluOp := uopc.SLT }
-        is("b0000000011".U) { io.aluOp := uopc.SLTU }
-        //otherwise{
-          //io.exception := true.B
-        //}
+    switch(funct3) {
+      is(Funct3.ADD_SUB) {
+        when(funct7 === Funct7.NORMAL) {
+          io.uop := ADD
+        }.elsewhen(funct7 === Funct7.ALT) {
+          io.uop := SUB
+        }.otherwise {
+          io.uop := NOP
+          io.XcptInvalid := true.B
+        }
+      }
+      is(Funct3.SLL) {
+        io.uop := SLL
+      }
+      is(Funct3.SLT) {
+        io.uop := SLT
+      }
+      is(Funct3.SLTU) {
+        io.uop := SLTU
+      }
+      is(Funct3.XOR) {
+        io.uop := XOR
+      }
+      is(Funct3.SRL_SRA) {
+        when(funct7 === Funct7.NORMAL) {
+          io.uop := SRL
+        }.elsewhen(funct7 === Funct7.ALT) {
+          io.uop := SRA
+        }.otherwise {
+          io.uop := NOP
+          io.XcptInvalid := true.B
+        }
+      }
+      is(Funct3.OR) {
+        io.uop := OR
+      }
+      is(Funct3.AND) {
+        io.uop := AND
       }
     }
-
-    // -------------------------
-    // I-type ALU instructions
-    // -------------------------
-    is("b0010011".U) {
-      io.regWrite := true.B
-      io.opB      := immI
+  }
+    // I-type instructions (opcode = 0010011)
+    .elsewhen(opcode === Opcodes.I_TYPE) {
+      io.operandB := immI  // Use sign-extended immediate for I-type
 
       switch(funct3) {
-        is("b000".U) { io.aluOp := uopc.ADD }   // ADDI
-        is("b100".U) { io.aluOp := uopc.XOR }   // XORI
-        is("b110".U) { io.aluOp := uopc.OR  }   // ORI
-        is("b111".U) { io.aluOp := uopc.AND }   // ANDI
-        is("b010".U) { io.aluOp := uopc.SLT }   // SLTI
-        is("b011".U) { io.aluOp := uopc.SLTU }  // SLTIU
-        is("b001".U) { io.aluOp := uopc.SLL }   // SLLI
-        is("b101".U) {
-          when(funct7 === "b0000000".U) { io.aluOp := uopc.SRL }
-          .elsewhen(funct7 === "b0100000".U) { io.aluOp := uopc.SRA }
-          .otherwise { io.exception := true.B }
+        is(Funct3.ADD_SUB) {
+          io.uop := ADDI
         }
-        //otherwise {
-          //io.exception := true.B
-        //}
+        is(Funct3.SLT) {
+          io.uop := SLTI
+        }
+        is(Funct3.SLTU) {
+          io.uop := SLTIU
+        }
+        is(Funct3.XOR) {
+          io.uop := XORI
+        }
+        is(Funct3.OR) {
+          io.uop := ORI
+        }
+        is(Funct3.AND) {
+          io.uop := ANDI
+        }
+        is(Funct3.SLL) {
+          // SLLI: shamt is in bits [24:20], funct7 must be 0
+          when(funct7 === Funct7.NORMAL) {
+            io.uop := SLLI
+            io.operandB := io.instr(24, 20).pad(32)  // shamt only
+          }.otherwise {
+            io.uop := NOP
+            io.XcptInvalid := true.B
+          }
+        }
+        is(Funct3.SRL_SRA) {
+          when(funct7 === Funct7.NORMAL) {
+            io.uop := SRLI
+            io.operandB := io.instr(24, 20).pad(32)  // shamt only
+          }.elsewhen(funct7 === Funct7.ALT) {
+            io.uop := SRAI
+            io.operandB := io.instr(24, 20).pad(32)  // shamt only
+          }.otherwise {
+            io.uop := NOP
+            io.XcptInvalid := true.B
+          }
+        }
       }
     }
-    //otherwise {
-    // io.exception := true.B
-    //}
-  }
+    // Invalid opcode
+    .otherwise {
+      io.uop := NOP
+      io.XcptInvalid := true.B
+    }
 }
+//ToDo: Add your implementation according to the specification above here 

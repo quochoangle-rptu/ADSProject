@@ -1,3 +1,9 @@
+// ADS I Class Project
+// Pipelined RISC-V Core - EX Stage
+//
+// Chair of Electronic Design Automation, RPTU in Kaiserslautern
+// File created on 01/09/2026 by Tobias Jauch (@tojauch)
+
 /*
 Instruction Execute (EX) Stage: ALU operations and exception detection
 
@@ -28,82 +34,84 @@ package core_tile
 import chisel3._
 import chisel3.util._
 import Assignment02.{ALU, ALUOp}
-import core_tile.uopc._
+import uopc._
 
 // -----------------------------------------
 // Execute Stage
 // -----------------------------------------
-
 class EX extends Module {
   val io = IO(new Bundle {
-
     // Inputs from ID barrier
     val uop         = Input(uopc())
-    val opA         = Input(UInt(32.W))
-    val opB         = Input(UInt(32.W))
-    val rd          = Input(UInt(5.W))
-    val regWriteIn  = Input(Bool())
-    val exceptionIn = Input(Bool())
+    val operandA    = Input(UInt(32.W))
+    val operandB    = Input(UInt(32.W))
+    val XcptInvalid = Input(Bool())
 
     // Outputs to EX barrier
-    val aluRes    = Output(UInt(32.W))
-    val rdOut     = Output(UInt(5.W))
-    val regWrite  = Output(Bool())
-    val exception = Output(Bool())
+    val aluResult   = Output(UInt(32.W))
+    val exception   = Output(Bool())
   })
 
-  // ------------------------------------------------------------
-  // ALU instantiation
-  // ------------------------------------------------------------
+  // Instantiate ALU from Assignment02
   val alu = Module(new ALU)
 
-  alu.io.operandA := io.opA
-  alu.io.operandB := io.opB
+  // Connect operands to ALU
+  alu.io.operandA := io.operandA
+  alu.io.operandB := io.operandB
 
-  // ------------------------------------------------------------
   // Default ALU operation
-  // ------------------------------------------------------------
   alu.io.operation := ALUOp.ADD
 
-  // ------------------------------------------------------------
-  // uop → ALUOp mapping
-  // ------------------------------------------------------------
-  /*switch(io.uop) {
-    is(UOP_ADD)  { alu.io.operation := ALUOp.ADD  }
-    is(UOP_SUB)  { alu.io.operation := ALUOp.SUB  }
-    is(UOP_AND)  { alu.io.operation := ALUOp.AND  }
-    is(UOP_OR)   { alu.io.operation := ALUOp.OR   }
-    is(UOP_XOR)  { alu.io.operation := ALUOp.XOR  }
-    is(UOP_SLL)  { alu.io.operation := ALUOp.SLL  }
-    is(UOP_SRL)  { alu.io.operation := ALUOp.SRL  }
-    is(UOP_SRA)  { alu.io.operation := ALUOp.SRA  }
-    is(UOP_SLT)  { alu.io.operation := ALUOp.SLT  }
-    is(UOP_SLTU) { alu.io.operation := ALUOp.SLTU }
-  }*/
-
+  // Map micro-operation codes to ALU operations
+  // R-type and I-type instructions map to the same ALU operations
   switch(io.uop) {
-  is(uopc.ADD)   { alu.io.operation := ALUOp.ADD   }
-  is(uopc.SUB)   { alu.io.operation := ALUOp.SUB   }
-  is(uopc.AND)   { alu.io.operation := ALUOp.AND   }
-  is(uopc.OR)    { alu.io.operation := ALUOp.OR    }
-  is(uopc.XOR)   { alu.io.operation := ALUOp.XOR   }
-  is(uopc.SLL)   { alu.io.operation := ALUOp.SLL   }
-  is(uopc.SRL)   { alu.io.operation := ALUOp.SRL   }
-  is(uopc.SRA)   { alu.io.operation := ALUOp.SRA   }
-  is(uopc.SLT)   { alu.io.operation := ALUOp.SLT   }
-  is(uopc.SLTU)  { alu.io.operation := ALUOp.SLTU  }
+    // Addition operations
+    is(ADD)  { alu.io.operation := ALUOp.ADD }
+    is(ADDI) { alu.io.operation := ALUOp.ADD }
 
-  // NOP or default behavior
-  is(uopc.NOP)   { alu.io.operation := ALUOp.ADD }
+    // Subtraction (R-type only, no SUBI in RISC-V)
+    is(SUB)  { alu.io.operation := ALUOp.SUB }
+
+    // Bitwise AND
+    is(AND)  { alu.io.operation := ALUOp.AND }
+    is(ANDI) { alu.io.operation := ALUOp.AND }
+
+    // Bitwise OR
+    is(OR)   { alu.io.operation := ALUOp.OR }
+    is(ORI)  { alu.io.operation := ALUOp.OR }
+
+    // Bitwise XOR
+    is(XOR)  { alu.io.operation := ALUOp.XOR }
+    is(XORI) { alu.io.operation := ALUOp.XOR }
+
+    // Shift Left Logical
+    is(SLL)  { alu.io.operation := ALUOp.SLL }
+    is(SLLI) { alu.io.operation := ALUOp.SLL }
+
+    // Shift Right Logical
+    is(SRL)  { alu.io.operation := ALUOp.SRL }
+    is(SRLI) { alu.io.operation := ALUOp.SRL }
+
+    // Shift Right Arithmetic
+    is(SRA)  { alu.io.operation := ALUOp.SRA }
+    is(SRAI) { alu.io.operation := ALUOp.SRA }
+
+    // Set Less Than (signed)
+    is(SLT)  { alu.io.operation := ALUOp.SLT }
+    is(SLTI) { alu.io.operation := ALUOp.SLT }
+
+    // Set Less Than Unsigned
+    is(SLTU)  { alu.io.operation := ALUOp.SLTU }
+    is(SLTIU) { alu.io.operation := ALUOp.SLTU }
+
+    // NOP: default ADD with operands = 0 produces 0
+    is(NOP)  { alu.io.operation := ALUOp.ADD }
   }
 
+  // Output ALU result
+  io.aluResult := alu.io.aluResult
 
-  // ------------------------------------------------------------
-  // Outputs
-  // ------------------------------------------------------------
-  io.aluRes    := alu.io.aluResult
-  io.rdOut     := io.rd
-  io.regWrite  := io.regWriteIn
-  io.exception := io.exceptionIn //Exception is only propogated since ALU has no exception handling mechanism
+  // Pass through exception flag
+  io.exception := io.XcptInvalid
 }
-
+//ToDo: Add your implementation according to the specification above here 

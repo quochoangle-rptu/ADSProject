@@ -1,3 +1,10 @@
+// ADS I Class Project
+// Assignment 02: Arithmetic Logic Unit and UVM Testbench
+//
+// Chair of Electronic Design Automation, RPTU University Kaiserslautern-Landau
+// File created on 09/21/2025 by Tharindu Samarakoon (gug75kex@rptu.de)
+// File updated on 10/29/2025 by Tobias Jauch (tobias.jauch@rptu.de)
+
 package Assignment02
 
 import chisel3._
@@ -182,4 +189,4 @@ class ALU extends Module {
       io.aluResult := io.operandB
     }
   }
-}
+}// ToDo: Add your ALU implementation from Assignment02 here

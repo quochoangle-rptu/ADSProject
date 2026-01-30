@@ -33,30 +33,33 @@ Outputs:
 package core_tile
 
 import chisel3._
-import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
 
-class IF(BinaryFile: String) extends Module {
+// -----------------------------------------
+// Fetch Stage
+// -----------------------------------------
+
+class IF (BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    val instr = Output(UInt(32.W))
-    val pc    = Output(UInt(32.W))
+    // ToDo: Add I/O ports
+    val instr = Output(UInt(32.W))  // Fetched instruction output
   })
 
-  val pcReg    = RegInit(0.U(32.W)) // we initialize with 0
-  val instrReg = RegInit(0.U(32.W))
+//ToDo: Add your implementation according to the specification above here 
+// Instruction Memory: 4096 words x 32 bits
+// Loaded from binary file at compile time
+  val IMem = Mem(4096, UInt(32.W))
+  loadMemoryFromFile(IMem, BinaryFile)
 
-  // Combinational instruction memory
-  val imem = Mem(4096, UInt(32.W))
-  loadMemoryFromFile(imem, BinaryFile)
+  // Program Counter: starts at 0, increments by 1 each cycle
+  // (word-addressed, so PC=1 means address 4 in byte terms)
+  val PC = RegInit(0.U(32.W))
 
-  // Fetch instruction combinationally, register it
-  instrReg := imem(pcReg >> 2)
+  // Fetch instruction at current PC
+  // Use word-aligned addressing (PC directly indexes into memory)
+  io.instr := IMem(PC)
 
-  // Update PC
-  pcReg := pcReg + 4.U //LHS and RHS = registers, so assignment in next CC
-
-  io.pc    := pcReg //same cycle assignment
-  io.instr := instrReg
+  // Increment PC for next instruction
+  // In this simple implementation, we always fetch sequentially
+  PC := PC + 1.U
 }
-
-

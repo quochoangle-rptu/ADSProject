@@ -33,44 +33,33 @@ import chisel3._
 // -----------------------------------------
 // EX-Barrier
 // -----------------------------------------
-
 class EXBarrier extends Module {
   val io = IO(new Bundle {
-
     // Inputs from EX stage
-    val inAluResult    = Input(UInt(32.W))
-    val inRD           = Input(UInt(5.W))
-    val inXcptInvalid  = Input(Bool())
-    val inRegWrite = Input(Bool())
+    val inAluResult   = Input(UInt(32.W))
+    val inRD          = Input(UInt(5.W))
+    val inXcptInvalid = Input(Bool())
 
     // Outputs to MEM stage
     val outAluResult   = Output(UInt(32.W))
     val outRD          = Output(UInt(5.W))
     val outXcptInvalid = Output(Bool())
-    val outRegWrite = Output(Bool())
   })
 
-  // ------------------------------------------------------------
   // Pipeline registers
-  // ------------------------------------------------------------
-  val aluResReg = RegInit(0.U(32.W))
-  val rdReg     = RegInit(0.U(5.W))
-  val xcptReg   = RegInit(false.B)
-  val regWriteReg = RegInit(false.B)
+  val aluResultReg = RegInit(0.U(32.W))
+  val rdReg        = RegInit(0.U(5.W))
+  val xcptReg      = RegInit(false.B)
 
-  // ------------------------------------------------------------
-  // Latch inputs
-  // ------------------------------------------------------------
-  aluResReg := io.inAluResult
-  rdReg     := io.inRD
-  xcptReg   := io.inXcptInvalid
-  regWriteReg := io.inRegWrite
+  // Capture inputs on clock edge
+  aluResultReg := io.inAluResult
+  rdReg        := io.inRD
+  xcptReg      := io.inXcptInvalid
 
-  // ------------------------------------------------------------
-  // Drive outputs
-  // ------------------------------------------------------------
-  io.outAluResult   := aluResReg
+  // Output registered values
+  io.outAluResult   := aluResultReg
   io.outRD          := rdReg
   io.outXcptInvalid := xcptReg
-  io.outRegWrite := regWriteReg
 }
+//ToDo: Add your implementation according to the specification above here 
+
