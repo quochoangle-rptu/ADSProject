@@ -46,6 +46,16 @@ class EX extends Module {
     val operandA    = Input(UInt(32.W))
     val operandB    = Input(UInt(32.W))
     val XcptInvalid = Input(Bool())
+    val rs1 = Input(UInt(5.W))
+    val rs2 = Input(UInt(5.W))
+
+    // Forwarding control signals from ForwardingUnit
+    val forwardA    = Input(UInt(2.W))
+    val forwardB    = Input(UInt(2.W))
+
+    // Forwarded data from previous stages
+    val ex_mem_aluResult = Input(UInt(32.W))  // From EX/MEM
+    val mem_wb_aluResult = Input(UInt(32.W))  // From MEM/WB
 
     // Outputs to EX barrier
     val aluResult   = Output(UInt(32.W))
@@ -55,9 +65,24 @@ class EX extends Module {
   // Instantiate ALU from Assignment02
   val alu = Module(new ALU)
 
-  // Connect operands to ALU
-  alu.io.operandA := io.operandA
-  alu.io.operandB := io.operandB
+  // =====================================================
+  // Forwarding Muxes
+  // =====================================================
+  // forwardA: 0=operandA, 1=ex_mem_aluResult, 2=mem_wb_aluResult
+  val aluInputA = Mux(
+    io.forwardA === 1.U, io.ex_mem_aluResult,
+    Mux(io.forwardA === 2.U, io.mem_wb_aluResult, io.operandA)
+  )
+
+  // forwardB: 0=operandB, 1=ex_mem_aluResult, 2=mem_wb_aluResult
+  val aluInputB = Mux(
+    io.forwardB === 1.U, io.ex_mem_aluResult,
+    Mux(io.forwardB === 2.U, io.mem_wb_aluResult, io.operandB)
+  )
+
+  // Connect forwarded operands to ALU
+  alu.io.operandA := aluInputA
+  alu.io.operandB := aluInputB
 
   // Default ALU operation
   alu.io.operation := ALUOp.ADD

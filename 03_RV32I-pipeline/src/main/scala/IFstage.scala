@@ -45,7 +45,6 @@ class IF (BinaryFile: String) extends Module {
     val instr = Output(UInt(32.W))  // Fetched instruction output
   })
 
-//ToDo: Add your implementation according to the specification above here 
 // Instruction Memory: 4096 words x 32 bits
 // Loaded from binary file at compile time
   val IMem = Mem(4096, UInt(32.W))

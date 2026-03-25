@@ -39,26 +39,31 @@ class MEMBarrier extends Module {
     val inAluResult  = Input(UInt(32.W))
     val inRD         = Input(UInt(5.W))
     val inException  = Input(Bool())
+    val inRegWrite   = Input(Bool())
 
     // Outputs to WB stage
     val outAluResult  = Output(UInt(32.W))
     val outRD         = Output(UInt(5.W))
     val outException  = Output(Bool())
+    val outRegWrite   = Output(Bool())
   })
 
   // Pipeline registers
   val aluResultReg = RegInit(0.U(32.W))
   val rdReg        = RegInit(0.U(5.W))
   val exceptionReg = RegInit(false.B)
+  val regWriteReg  = RegInit(false.B)
 
   // Capture inputs on clock edge
   aluResultReg := io.inAluResult
   rdReg        := io.inRD
   exceptionReg := io.inException
+  regWriteReg  := io.inRegWrite
 
   // Output registered values
   io.outAluResult  := aluResultReg
   io.outRD         := rdReg
   io.outException  := exceptionReg
+  io.outRegWrite   := regWriteReg
 }
 //ToDo: Add your implementation according to the specification above here 

@@ -88,6 +88,9 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   // Register File (shared between ID and WB stages)
   val regFile = Module(new regFile)
 
+  //Forwarding Unit 
+  val fwd = Module(new ForwardingUnit)
+
   // =========================================================================
   // Connect pipeline stages
   // =========================================================================
@@ -99,28 +102,57 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   idStage.io.instr := ifBarrier.io.outInstr
 
   // ID Stage <-> Register File (read ports)
-  regFile.io.req_1  := idStage.io.regFileReq_A
+  regFile.io.req_1         := idStage.io.regFileReq_A
   idStage.io.regFileResp_A := regFile.io.resp_1
-  regFile.io.req_2  := idStage.io.regFileReq_B
+  regFile.io.req_2         := idStage.io.regFileReq_B
   idStage.io.regFileResp_B := regFile.io.resp_2
+  //regFile.io.wr_en         := idStage.io.regWrite
 
   // ID Stage -> ID Barrier
   idBarrier.io.inUOP         := idStage.io.uop
   idBarrier.io.inRD          := idStage.io.rd
+  idBarrier.io.inRS1         := idStage.io.rs1
+  idBarrier.io.inRS2         := idStage.io.rs2
   idBarrier.io.inOperandA    := idStage.io.operandA
   idBarrier.io.inOperandB    := idStage.io.operandB
   idBarrier.io.inXcptInvalid := idStage.io.XcptInvalid
+  idBarrier.io.inRegWrite    := idStage.io.regWrite
+
+  
 
   // ID Barrier -> EX Stage
   exStage.io.uop         := idBarrier.io.outUOP
   exStage.io.operandA    := idBarrier.io.outOperandA
   exStage.io.operandB    := idBarrier.io.outOperandB
   exStage.io.XcptInvalid := idBarrier.io.outXcptInvalid
+  exStage.io.rs1         := idBarrier.io.outRS1
+  exStage.io.rs2         := idBarrier.io.outRS2
+
+  //ID Barrier -> Forawarding Unit (pass register indices, not operand values)
+  fwd.io.rs1 := idBarrier.io.outRS1
+  fwd.io.rs2 := idBarrier.io.outRS2
+  //fwd.io.rs1 := idStage.io.rs1
+  //fwd.io.rs2 := idStage.io.rs2
+  //fwd.io.rs1 := exStage.io.rs1
+  //fwd.io.rs2 := exStage.io.rs2
+
+  // ForwardingUnit -> EX Stage (forwarding control signals)
+  exStage.io.forwardA    := fwd.io.forwardA
+  exStage.io.forwardB    := fwd.io.forwardB
+
+  // Forwarded data to EX Stage
+  exStage.io.ex_mem_aluResult := exBarrier.io.outAluResult
+  exStage.io.mem_wb_aluResult := memBarrier.io.outAluResult
 
   // EX Stage -> EX Barrier
   exBarrier.io.inAluResult   := exStage.io.aluResult
   exBarrier.io.inRD          := idBarrier.io.outRD  // Pass RD through
   exBarrier.io.inXcptInvalid := exStage.io.exception
+  exBarrier.io.inRegWrite    := idBarrier.io.outRegWrite
+
+  //EX Barrier -> Forwarding Unit
+  fwd.io.ex_mem_rd       := exBarrier.io.outRD
+  fwd.io.ex_mem_regWrite := exBarrier.io.outRegWrite
 
   // EX Barrier -> MEM Stage (MEM stage has no I/O in this implementation)
   // MEM stage is a placeholder, so we pass data directly through
@@ -129,10 +161,16 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   memBarrier.io.inAluResult := exBarrier.io.outAluResult
   memBarrier.io.inRD        := exBarrier.io.outRD
   memBarrier.io.inException := exBarrier.io.outXcptInvalid
+  memBarrier.io.inRegWrite  := exBarrier.io.outRegWrite
+
+  // MEM Barrier -> Forwarding Unit
+  fwd.io.mem_wb_rd       := memBarrier.io.outRD
+  fwd.io.mem_wb_regWrite := memBarrier.io.outRegWrite
 
   // MEM Barrier -> WB Stage
   wbStage.io.aluResult := memBarrier.io.outAluResult
   wbStage.io.rd        := memBarrier.io.outRD
+  wbStage.io.inRegWrite:= memBarrier.io.outRegWrite
 
   // WB Stage <-> Register File (write port)
   regFile.io.req_3 := wbStage.io.regFileReq
@@ -142,6 +180,7 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   wbBarrier.io.inXcptInvalid := memBarrier.io.outException
 
   // WB Barrier -> Outputs
+  //io.check_res := wbStage.io.check_res
   io.check_res := wbBarrier.io.outCheckRes
   io.exception := wbBarrier.io.outXcptInvalid
 

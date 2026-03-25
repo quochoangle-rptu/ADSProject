@@ -16,7 +16,7 @@ Extracted Fields from 32-bit Instruction (see RISC-V specification for reference
     rs2: second source register address
     imm: 12-bit immediate value (I-type, sign-extended)
 
-Register File Interfaces:
+Register File Interfaces: Since we can only read in the decode stage
     regFileReq_A, regFileResp_A: read port for rs1 operand
     regFileReq_B, regFileResp_B: read port for rs2 operand
 
@@ -58,9 +58,12 @@ class ID extends Module {
     // Outputs to ID barrier
     val uop         = Output(uopc())       // Micro-operation code
     val rd          = Output(UInt(5.W))    // Destination register
+    val rs1         = Output(UInt(5.W))    // First source register index
+    val rs2         = Output(UInt(5.W))    // Second source register index
     val operandA    = Output(UInt(32.W))   // First operand (from rs1)
     val operandB    = Output(UInt(32.W))   // Second operand (from rs2 or immediate)
     val XcptInvalid = Output(Bool())       // Invalid instruction flag
+    val regWrite    = Output(Bool())       // Register write enable
   })
 
   // =====================================================
@@ -90,6 +93,9 @@ class ID extends Module {
   io.uop := NOP
   io.XcptInvalid := false.B
   io.rd := rd
+  io.rs1 := rs1
+  io.rs2 := rs2
+  io.regWrite := true.B  // Default: most instructions write to rd
   io.operandA := io.regFileResp_A.data  // Default: rs1 value
   io.operandB := io.regFileResp_B.data  // Default: rs2 value (R-type)
 
@@ -189,6 +195,7 @@ class ID extends Module {
     .otherwise {
       io.uop := NOP
       io.XcptInvalid := true.B
+      io.regWrite := false.B  // Don't write for invalid instructions
     }
 }
 //ToDo: Add your implementation according to the specification above here 
