@@ -66,9 +66,21 @@ class regFile extends Module {
   // 32 registers, each 32 bits wide, all initialised to 0
   val registers = RegInit(VecInit(Seq.fill(32)(0.U(32.W))))
 
-  // Combinational (asynchronous) reads; x0 is hard-wired to 0
-  io.resp_1.data := Mux(io.req_1.addr === 0.U, 0.U, registers(io.req_1.addr))
-  io.resp_2.data := Mux(io.req_2.addr === 0.U, 0.U, registers(io.req_2.addr))
+  // Combinational reads with write-before-read bypass:
+  // If WB is simultaneously writing to the register being read (same cycle),
+  // return the new value directly instead of the stale registered value.
+  // This resolves the 2-NOP gap hazard without needing a third forwarding path.
+  // x0 is always hard-wired to 0.
+  def bypassRead(addr: UInt): UInt = Mux(
+    addr === 0.U, 0.U,
+    Mux(io.req_3.wr_en && io.req_3.addr =/= 0.U && io.req_3.addr === addr,
+      io.req_3.data,
+      registers(addr)
+    )
+  )
+
+  io.resp_1.data := bypassRead(io.req_1.addr)
+  io.resp_2.data := bypassRead(io.req_2.addr)
 
   // Synchronous write; writing to x0 is suppressed
   when(io.req_3.wr_en && io.req_3.addr =/= 0.U) {

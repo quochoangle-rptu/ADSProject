@@ -381,10 +381,127 @@ class PipelinedRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.result.expect(2047.U)
       dut.io.exception.expect(false.B)
+      println("PASS: ADDI x19, x0, 2047 -> 2047")
 
-      // Additional instruction
+      // Additional instruction (instr 78 = ADDI x20, x0, -2048, not explicitly checked)
       dut.clock.step(1)
-      // Check whatever comes next...
+
+      // =========================================================================
+      // SECTION 12: Forwarding Unit Tests
+      // =========================================================================
+      // Step past existing unchecked instructions 79-96 (18 steps)
+      dut.clock.step(18)
+      // Now at total step 101; next step(1) shows instruction 97 result
+
+      println("\n=== SECTION 12: Forwarding Unit Tests ===")
+
+      // ---- Test A: EX/MEM forwarding (0-NOP gap, I-type) ----
+      // Instr 97: ADDI x25, x0, 10 -> x25 = 10  (producer)
+      dut.clock.step(1)
+      dut.io.result.expect(10.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x25, x0, 10 -> 10 (setup)")
+
+      // Instr 98: ADDI x25, x25, 5  (0-NOP gap -> EX/MEM hazard on x25)
+      // Without forwarding: stale_x25 + 5 = wrong
+      // With EX/MEM forwarding: 10 + 5 = 15 (correct)
+      dut.clock.step(1)
+      dut.io.result.expect(15.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x25, x25, 5 -> 15 [EX/MEM forwarding on rs1]")
+
+      // Instrs 99-100: NOPs (drain)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // ---- Test B: MEM/WB forwarding (1-NOP gap, I-type) ----
+      // Instr 101: ADDI x26, x0, 20 -> x26 = 20  (producer)
+      dut.clock.step(1)
+      dut.io.result.expect(20.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x26, x0, 20 -> 20 (setup)")
+
+      // Instr 102: NOP  (1-NOP gap)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // Instr 103: ADDI x26, x26, 8  (1-NOP gap -> MEM/WB hazard on x26)
+      // Without forwarding: stale_x26 + 8 = wrong
+      // With MEM/WB forwarding: 20 + 8 = 28 (correct)
+      dut.clock.step(1)
+      dut.io.result.expect(28.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x26, x26, 8 -> 28 [MEM/WB forwarding on rs1]")
+
+      // Instrs 104-105: NOPs (drain)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // ---- Test C: R-type EX/MEM forwarding (both rs1 and rs2 hazard) ----
+      // Instr 106: ADDI x27, x0, 100 -> x27 = 100  (producer)
+      dut.clock.step(1)
+      dut.io.result.expect(100.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x27, x0, 100 -> 100 (setup)")
+
+      // Instr 107: ADD x27, x27, x27  (rs1=rs2=x27 -> EX/MEM hazard on both operands)
+      // Without forwarding: stale + stale = 0 (wrong)
+      // With EX/MEM forwarding on both: 100 + 100 = 200 (correct)
+      dut.clock.step(1)
+      dut.io.result.expect(200.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADD x27, x27, x27 -> 200 [EX/MEM forwarding on both rs1 and rs2]")
+
+      // Instrs 108-109: NOPs (drain)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // ---- Test D: R-type MEM/WB forwarding (both rs1 and rs2 hazard) ----
+      // Instr 110: ADDI x28, x0, 50 -> x28 = 50  (producer)
+      dut.clock.step(1)
+      dut.io.result.expect(50.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x28, x0, 50 -> 50 (setup)")
+
+      // Instr 111: NOP  (1-NOP gap)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // Instr 112: ADD x28, x28, x28  (rs1=rs2=x28, 1-NOP gap -> MEM/WB hazard on both)
+      // Without forwarding: 0 + 0 = 0 (wrong)
+      // With MEM/WB forwarding on both: 50 + 50 = 100 (correct)
+      dut.clock.step(1)
+      dut.io.result.expect(100.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADD x28, x28, x28 -> 100 [MEM/WB forwarding on both rs1 and rs2]")
+
+      // Instrs 113-114: NOPs (drain)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+      dut.clock.step(1); dut.io.result.expect(0.U)
+
+      // ---- Test E: Chain of dependencies (EX/MEM + MEM/WB in consecutive instructions) ----
+      // Instr 115: ADDI x29, x0, 3 -> x29 = 3
+      dut.clock.step(1)
+      dut.io.result.expect(3.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADDI x29, x0, 3 -> 3 (chain setup)")
+
+      // Instr 116: ADD x30, x29, x29  (EX/MEM hazard on x29 for both rs1 and rs2)
+      // x30 = 3 + 3 = 6
+      dut.clock.step(1)
+      dut.io.result.expect(6.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADD x30, x29, x29 -> 6 [EX/MEM forwarding on x29 (rs1 and rs2)]")
+
+      // Instr 117: ADD x31, x30, x29
+      //   rs1=x30: EX/MEM forward (x30 in EX barrier) -> 6
+      //   rs2=x29: MEM/WB forward (x29 in MEM barrier) -> 3
+      //   x31 = 6 + 3 = 9
+      dut.clock.step(1)
+      dut.io.result.expect(9.U)
+      dut.io.exception.expect(false.B)
+      println("PASS: ADD x31, x30, x29 -> 9 [EX/MEM on x30 (rs1) + MEM/WB on x29 (rs2)]")
+
+      // Instr 118: NOP (final drain)
+      dut.clock.step(1); dut.io.result.expect(0.U)
 
       println("\n=== ALL TESTS PASSED ===")
     }

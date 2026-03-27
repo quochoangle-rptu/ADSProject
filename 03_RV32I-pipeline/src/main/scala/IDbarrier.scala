@@ -44,6 +44,9 @@ class IDBarrier extends Module {
     // Inputs from ID stage
     val inUOP         = Input(uopc())
     val inRD          = Input(UInt(5.W))
+    val inRS1         = Input(UInt(5.W))   // source reg 1 address (for forwarding unit)
+    val inRS2         = Input(UInt(5.W))   // source reg 2 address (for forwarding unit)
+    val inIsRType     = Input(Bool())       // true = R-type (operandB uses rs2)
     val inOperandA    = Input(UInt(32.W))
     val inOperandB    = Input(UInt(32.W))
     val inXcptInvalid = Input(Bool())
@@ -51,6 +54,9 @@ class IDBarrier extends Module {
     // Outputs to EX stage
     val outUOP         = Output(uopc())
     val outRD          = Output(UInt(5.W))
+    val outRS1         = Output(UInt(5.W))
+    val outRS2         = Output(UInt(5.W))
+    val outIsRType     = Output(Bool())
     val outOperandA    = Output(UInt(32.W))
     val outOperandB    = Output(UInt(32.W))
     val outXcptInvalid = Output(Bool())
@@ -59,18 +65,27 @@ class IDBarrier extends Module {
   // Pipeline registers (initialised to NOP / zero / false)
   val uopReg      = RegInit(NOP)
   val rdReg       = RegInit(0.U(5.W))
+  val rs1Reg      = RegInit(0.U(5.W))
+  val rs2Reg      = RegInit(0.U(5.W))
+  val isRTypeReg  = RegInit(false.B)
   val operandAReg = RegInit(0.U(32.W))
   val operandBReg = RegInit(0.U(32.W))
   val xcptReg     = RegInit(false.B)
 
   uopReg      := io.inUOP
   rdReg       := io.inRD
+  rs1Reg      := io.inRS1
+  rs2Reg      := io.inRS2
+  isRTypeReg  := io.inIsRType
   operandAReg := io.inOperandA
   operandBReg := io.inOperandB
   xcptReg     := io.inXcptInvalid
 
   io.outUOP         := uopReg
   io.outRD          := rdReg
+  io.outRS1         := rs1Reg
+  io.outRS2         := rs2Reg
+  io.outIsRType     := isRTypeReg
   io.outOperandA    := operandAReg
   io.outOperandB    := operandBReg
   io.outXcptInvalid := xcptReg

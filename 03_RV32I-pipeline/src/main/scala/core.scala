@@ -78,7 +78,8 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   val wbStage    = Module(new WB)
   val wbBarrier  = Module(new WBBarrier)
 
-  val regFileInst = Module(new regFile)
+  val regFileInst    = Module(new regFile)
+  val forwardingUnit = Module(new ForwardingUnit)
 
   // =========================================================================
   // Connect pipeline stages
@@ -91,23 +92,37 @@ class PipelinedRV32Icore (BinaryFile: String) extends Module {
   idStage.io.instr := ifBarrier.io.outInstr
 
   // ID Stage ↔ Register File (read ports)
-  regFileInst.io.req_1  := idStage.io.regFileReq_A
+  regFileInst.io.req_1     := idStage.io.regFileReq_A
   idStage.io.regFileResp_A := regFileInst.io.resp_1
-  regFileInst.io.req_2  := idStage.io.regFileReq_B
+  regFileInst.io.req_2     := idStage.io.regFileReq_B
   idStage.io.regFileResp_B := regFileInst.io.resp_2
 
   // ID Stage → ID Barrier
   idBarrier.io.inUOP         := idStage.io.uop
   idBarrier.io.inRD          := idStage.io.rd
+  idBarrier.io.inRS1         := idStage.io.rs1
+  idBarrier.io.inRS2         := idStage.io.rs2
+  idBarrier.io.inIsRType     := idStage.io.isRType
   idBarrier.io.inOperandA    := idStage.io.operandA
   idBarrier.io.inOperandB    := idStage.io.operandB
   idBarrier.io.inXcptInvalid := idStage.io.XcptInvalid
 
-  // ID Barrier → EX Stage (RD is forwarded directly, EX doesn't modify it)
-  exStage.io.uop         := idBarrier.io.outUOP
-  exStage.io.operandA    := idBarrier.io.outOperandA
-  exStage.io.operandB    := idBarrier.io.outOperandB
-  exStage.io.XcptInvalid := idBarrier.io.outXcptInvalid
+  // Forwarding Unit: detects RAW hazards for the instruction currently in EX
+  forwardingUnit.io.rs1   := idBarrier.io.outRS1
+  forwardingUnit.io.rs2   := idBarrier.io.outRS2
+  forwardingUnit.io.exRD  := exBarrier.io.outRD
+  forwardingUnit.io.memRD := memBarrier.io.outRD
+
+  // ID Barrier → EX Stage (with forwarding signals)
+  exStage.io.uop             := idBarrier.io.outUOP
+  exStage.io.operandA        := idBarrier.io.outOperandA
+  exStage.io.operandB        := idBarrier.io.outOperandB
+  exStage.io.isRType         := idBarrier.io.outIsRType
+  exStage.io.XcptInvalid     := idBarrier.io.outXcptInvalid
+  exStage.io.forwardA        := forwardingUnit.io.forwardA
+  exStage.io.forwardB        := forwardingUnit.io.forwardB
+  exStage.io.forwardedExData  := exBarrier.io.outAluResult
+  exStage.io.forwardedMemData := memBarrier.io.outAluResult
 
   // EX Stage → EX Barrier (RD passed from ID barrier, bypassing EX)
   exBarrier.io.inAluResult   := exStage.io.aluResult

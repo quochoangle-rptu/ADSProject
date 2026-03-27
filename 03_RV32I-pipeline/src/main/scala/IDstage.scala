@@ -59,6 +59,9 @@ class ID extends Module {
     // Outputs to ID barrier
     val uop         = Output(uopc())
     val rd          = Output(UInt(5.W))
+    val rs1         = Output(UInt(5.W))   // source register 1 address (for forwarding unit)
+    val rs2         = Output(UInt(5.W))   // source register 2 address (for forwarding unit)
+    val isRType     = Output(Bool())       // true when operandB comes from rs2 (R-type)
     val operandA    = Output(UInt(32.W))
     val operandB    = Output(UInt(32.W))
     val XcptInvalid = Output(Bool())
@@ -83,6 +86,9 @@ class ID extends Module {
   io.uop         := NOP
   io.XcptInvalid := false.B
   io.rd          := rd
+  io.rs1         := rs1
+  io.rs2         := rs2
+  io.isRType     := (opcode === Opcodes.R_TYPE)
   io.operandA    := io.regFileResp_A.data
   io.operandB    := io.regFileResp_B.data  // default: rs2 (R-type)
 

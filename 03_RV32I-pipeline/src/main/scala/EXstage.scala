@@ -46,7 +46,15 @@ class EX extends Module {
     val uop         = Input(uopc())
     val operandA    = Input(UInt(32.W))
     val operandB    = Input(UInt(32.W))
+    val isRType     = Input(Bool())        // true = R-type; enables operandB forwarding
     val XcptInvalid = Input(Bool())
+
+    // Forwarding control from ForwardingUnit
+    // 0 = no forward, 1 = MEM/WB forward, 2 = EX/MEM forward
+    val forwardA        = Input(UInt(2.W))
+    val forwardB        = Input(UInt(2.W))
+    val forwardedExData  = Input(UInt(32.W)) // EX/MEM forwarded value (EXBarrier result)
+    val forwardedMemData = Input(UInt(32.W)) // MEM/WB forwarded value (MEMBarrier result)
 
     // Outputs to EX barrier
     val aluResult   = Output(UInt(32.W))
@@ -56,8 +64,25 @@ class EX extends Module {
   // Instantiate ALU from Assignment02
   val alu = Module(new ALU)
 
-  alu.io.operandA  := io.operandA
-  alu.io.operandB  := io.operandB
+  // ---- Forwarding muxes (placed before ALU inputs) ----------------------
+  // operandA selects between: ID/EX value, MEM/WB forward, or EX/MEM forward
+  val aluInputA = MuxCase(io.operandA, Seq(
+    (io.forwardA === 2.U) -> io.forwardedExData,
+    (io.forwardA === 1.U) -> io.forwardedMemData
+  ))
+
+  // operandB: only apply forwarding when the instruction is R-type
+  // (I-type uses an immediate in operandB which must NOT be overwritten)
+  val aluInputB = Mux(io.isRType,
+    MuxCase(io.operandB, Seq(
+      (io.forwardB === 2.U) -> io.forwardedExData,
+      (io.forwardB === 1.U) -> io.forwardedMemData
+    )),
+    io.operandB  // I-type: operandB is already the correct sign-extended immediate
+  )
+
+  alu.io.operandA  := aluInputA
+  alu.io.operandB  := aluInputB
   alu.io.operation := ALUOp.ADD  // default
 
   // Map micro-operation codes to ALU operations

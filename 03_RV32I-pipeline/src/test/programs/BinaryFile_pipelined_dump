@@ -104,3 +104,38 @@ fffb0b93 // ADDI x23, x22, -1                    -> x23 = 0 (1 + (-1) = 0)
 017b8c33 // ADD x24, x23, x23                    -> x24 = 0 (0 + 0 = 0)
          // We'd need more setup for proper wraparound test
 00000013 // NOP (end marker)
+// =============================================================================
+// SECTION 12: Forwarding Unit Tests
+// =============================================================================
+
+// ---- Test A: EX/MEM forwarding (0-NOP gap, I-type) ----
+00a00c93 // ADDI x25, x0, 10                    -> x25 = 10 (producer)
+005c8c93 // ADDI x25, x25, 5  [EX/MEM hazard]   -> x25 = 15 (forwarded x25=10 + 5)
+00000013 // NOP
+00000013 // NOP
+
+// ---- Test B: MEM/WB forwarding (1-NOP gap, I-type) ----
+01400d13 // ADDI x26, x0, 20                    -> x26 = 20 (producer)
+00000013 // NOP (1-NOP gap)
+008d0d13 // ADDI x26, x26, 8  [MEM/WB hazard]   -> x26 = 28 (forwarded x26=20 + 8)
+00000013 // NOP
+00000013 // NOP
+
+// ---- Test C: R-type EX/MEM forwarding (both rs1 and rs2 hazard) ----
+06400d93 // ADDI x27, x0, 100                   -> x27 = 100 (producer)
+01bd8db3 // ADD x27, x27, x27 [EX/MEM both]     -> x27 = 200 (forward 100+100)
+00000013 // NOP
+00000013 // NOP
+
+// ---- Test D: R-type MEM/WB forwarding (both rs1 and rs2 hazard) ----
+03200e13 // ADDI x28, x0, 50                    -> x28 = 50 (producer)
+00000013 // NOP (1-NOP gap)
+01ce0e33 // ADD x28, x28, x28 [MEM/WB both]     -> x28 = 100 (forward 50+50)
+00000013 // NOP
+00000013 // NOP
+
+// ---- Test E: Chain of dependencies ----
+00300e93 // ADDI x29, x0, 3                     -> x29 = 3
+01de8f33 // ADD x30, x29, x29  [EX/MEM both]    -> x30 = 6  (forward x29=3 for rs1 and rs2)
+01df0fb3 // ADD x31, x30, x29  [EX/MEM+MEM/WB]  -> x31 = 9  (EX/MEM x30=6, MEM/WB x29=3)
+00000013 // NOP (final drain)
