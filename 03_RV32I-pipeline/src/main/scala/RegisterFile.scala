@@ -36,22 +36,42 @@ Functionality:
 // -----------------------------------------
 
 class regFileReadReq extends Bundle {
-    //ToDo: implement bundle for read request
+    val addr = Input(UInt(5.W))   // 5 bits to address 32 registers (x0–x31)
 }
 
 class regFileReadResp extends Bundle {
-    //ToDo: implement bundle for read response
+    val data = Output(UInt(32.W)) // 32-bit register data
 }
 
 class regFileWriteReq extends Bundle {
-    //ToDo: implement bundle for write request
+    val addr  = Input(UInt(5.W))   // Destination register address
+    val data  = Input(UInt(32.W))  // Data to write
+    val wr_en = Input(Bool())       // Write enable signal
 }
 
 class regFile extends Module {
   val io = IO(new Bundle {
-    //ToDo: Add I/O ports 
-})
+    // Read port 1 (for rs1)
+    val req_1  = new regFileReadReq
+    val resp_1 = new regFileReadResp
 
-//ToDo: Add your implementation according to the specification above here 
+    // Read port 2 (for rs2)
+    val req_2  = new regFileReadReq
+    val resp_2 = new regFileReadResp
 
+    // Write port (for rd)
+    val req_3  = new regFileWriteReq
+  })
+
+  // 32 registers, each 32 bits wide, all initialised to 0
+  val registers = RegInit(VecInit(Seq.fill(32)(0.U(32.W))))
+
+  // Combinational (asynchronous) reads; x0 is hard-wired to 0
+  io.resp_1.data := Mux(io.req_1.addr === 0.U, 0.U, registers(io.req_1.addr))
+  io.resp_2.data := Mux(io.req_2.addr === 0.U, 0.U, registers(io.req_2.addr))
+
+  // Synchronous write; writing to x0 is suppressed
+  when(io.req_3.wr_en && io.req_3.addr =/= 0.U) {
+    registers(io.req_3.addr) := io.req_3.data
+  }
 }

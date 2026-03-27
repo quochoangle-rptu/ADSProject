@@ -40,4 +40,22 @@ import chisel3._
 // Writeback Stage
 // -----------------------------------------
 
-//ToDo: Add your implementation according to the specification above here 
+class WB extends Module {
+  val io = IO(new Bundle {
+    // Inputs from MEM barrier
+    val aluResult = Input(UInt(32.W))
+    val rd        = Input(UInt(5.W))
+
+    // Register file write interface
+    val regFileReq = Output(new regFileWriteReq)
+
+    // Output for testbench verification
+    val check_res = Output(UInt(32.W))
+  })
+
+  io.regFileReq.addr  := io.rd
+  io.regFileReq.data  := io.aluResult
+  io.regFileReq.wr_en := true.B  // always write for R/I-type instructions
+
+  io.check_res := io.aluResult
+}
