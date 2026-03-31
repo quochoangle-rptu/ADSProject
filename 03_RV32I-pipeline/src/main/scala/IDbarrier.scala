@@ -1,92 +1,51 @@
-// ADS I Class Project
-// Pipelined RISC-V Core - ID Barrier
-//
-// Chair of Electronic Design Automation, RPTU in Kaiserslautern
-// File created on 01/09/2026 by Tobias Jauch (@tojauch)
-
-/*
-ID-Barrier: pipeline register between Decode and Execute stages
-
-Internal Registers:
-    uop: micro-operation code (from uopc enum)
-    rd: destination register index, initialized to 0
-    operandA: first source operand, initialized to 0
-    operandB: second operand/immediate, initialized to 0
-
-Inputs:
-    inUOP: micro-operation code from ID stage
-    inRD: destination register from ID stage
-    inOperandA: first operand from ID stage
-    inOperandB: second operand/immediate from ID stage
-    inXcptInvalid: exception flag from ID stage
-
-Outputs:
-    outUOP: micro-operation code to EX stage
-    outRD: destination register to EX stage
-    outOperandA: first operand to EX stage
-    outOperandB: second operand to EX stage
-    outXcptInvalid: exception flag to EX stage
-Functionality:
-    Save all input signals to a register and output them in the following clock cycle
-*/
-
 package core_tile
 
 import chisel3._
-//import uopc._
-import core_tile.uopc._
-
-// -----------------------------------------
-// ID-Barrier
-// -----------------------------------------
+import uopc._
 
 class IDBarrier extends Module {
   val io = IO(new Bundle {
-
-    // Inputs from ID stage
-    val inUOP          = Input(uopc())
-    val inRD           = Input(UInt(5.W))
-    val inOperandA     = Input(UInt(32.W))
-    val inOperandB     = Input(UInt(32.W))
-    val inXcptInvalid  = Input(Bool())
-    val inRegWrite     = Input(Bool())
-
-    // Outputs to EX stage
-    val outUOP         = Output(uopc())
-    val outRD          = Output(UInt(5.W))
-    val outOperandA    = Output(UInt(32.W))
-    val outOperandB    = Output(UInt(32.W))
-    val outXcptInvalid = Output(Bool())
-    val outRegWrite    = Output(Bool())
+    val inUOP          = Input(uopc());     val outUOP          = Output(uopc())
+    val inRD           = Input(UInt(5.W));  val outRD           = Output(UInt(5.W))
+    val inRS1          = Input(UInt(5.W));  val outRS1          = Output(UInt(5.W))
+    val inRS2          = Input(UInt(5.W));  val outRS2          = Output(UInt(5.W))
+    val inOperandA     = Input(UInt(32.W)); val outOperandA     = Output(UInt(32.W))
+    val inOperandB     = Input(UInt(32.W)); val outOperandB     = Output(UInt(32.W))
+    val inOpBSel       = Input(Bool());     val outOpBSel       = Output(Bool())
+    val inWrEn         = Input(Bool());     val outWrEn         = Output(Bool())
+    val inPC           = Input(UInt(32.W)); val outPC           = Output(UInt(32.W))
+    val inBranchTarget = Input(UInt(32.W)); val outBranchTarget = Output(UInt(32.W))
+    val inXcptInvalid  = Input(Bool());     val outXcptInvalid  = Output(Bool())
+    // BTB prediction info (passthrough)
+    val inBtbHit          = Input(Bool());  val outBtbHit          = Output(Bool())
+    val inBtbPredictTaken = Input(Bool());  val outBtbPredictTaken = Output(Bool())
+    val flush             = Input(Bool())
   })
 
-  // ------------------------------------------------------------
-  // Pipeline registers
-  // ------------------------------------------------------------
-  val uopReg      = RegInit(uopc.NOP)
-  val rdReg       = RegInit(0.U(5.W))
-  val opAReg      = RegInit(0.U(32.W))
-  val opBReg      = RegInit(0.U(32.W))
-  val xcptReg     = RegInit(false.B)
-  val regWriteReg = RegInit(false.B)
+  val uopR     = RegInit(NOP);          val rdR     = RegInit(0.U(5.W))
+  val rs1R     = RegInit(0.U(5.W));     val rs2R    = RegInit(0.U(5.W))
+  val opAR     = RegInit(0.U(32.W));    val opBR    = RegInit(0.U(32.W))
+  val opBSelR  = RegInit(false.B);      val wrEnR   = RegInit(false.B)
+  val pcR      = RegInit(0.U(32.W));    val btR     = RegInit(0.U(32.W))
+  val xcptR    = RegInit(false.B)
+  val btbHitR  = RegInit(false.B);      val btbPTR  = RegInit(false.B)
 
-  // ------------------------------------------------------------
-  // Latch inputs
-  // ------------------------------------------------------------
-  uopReg  := io.inUOP
-  rdReg   := io.inRD
-  opAReg  := io.inOperandA
-  opBReg  := io.inOperandB
-  xcptReg := io.inXcptInvalid
-  regWriteReg := io.inRegWrite
+  when(io.flush) {
+    uopR:=NOP; rdR:=0.U; rs1R:=0.U; rs2R:=0.U
+    opAR:=0.U; opBR:=0.U; opBSelR:=false.B; wrEnR:=false.B
+    pcR:=0.U; btR:=0.U; xcptR:=false.B
+    btbHitR:=false.B; btbPTR:=false.B
+  }.otherwise {
+    uopR:=io.inUOP; rdR:=io.inRD; rs1R:=io.inRS1; rs2R:=io.inRS2
+    opAR:=io.inOperandA; opBR:=io.inOperandB; opBSelR:=io.inOpBSel
+    wrEnR:=io.inWrEn; pcR:=io.inPC; btR:=io.inBranchTarget
+    xcptR:=io.inXcptInvalid
+    btbHitR:=io.inBtbHit; btbPTR:=io.inBtbPredictTaken
+  }
 
-  // ------------------------------------------------------------
-  // Drive outputs
-  // ------------------------------------------------------------
-  io.outUOP         := uopReg
-  io.outRD          := rdReg
-  io.outOperandA    := opAReg
-  io.outOperandB    := opBReg
-  io.outXcptInvalid := xcptReg
-  io.outRegWrite := regWriteReg
+  io.outUOP:=uopR; io.outRD:=rdR; io.outRS1:=rs1R; io.outRS2:=rs2R
+  io.outOperandA:=opAR; io.outOperandB:=opBR; io.outOpBSel:=opBSelR
+  io.outWrEn:=wrEnR; io.outPC:=pcR; io.outBranchTarget:=btR
+  io.outXcptInvalid:=xcptR
+  io.outBtbHit:=btbHitR; io.outBtbPredictTaken:=btbPTR
 }

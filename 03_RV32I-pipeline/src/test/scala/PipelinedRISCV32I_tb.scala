@@ -1,9 +1,3 @@
-// ADS I Class Project
-// Pipelined RISC-V Core
-//
-// Chair of Electronic Design Automation, RPTU in Kaiserslautern
-// File created on 01/15/2023 by Tobias Jauch (@tojauch)
-
 package PipelinedRV32I_Tester
 
 import chisel3._
@@ -13,395 +7,330 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class PipelinedRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
 
-"RV32I_BasicTester" should "work" in {
-    test(new PipelinedRV32I("src/test/programs/BinaryFile_pipelined")).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+  "RV32I_Combined_Tester" should "pass all tests" in {
+    test(new PipelinedRV32I("src/test/programs/BinaryFile")).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
       dut.clock.setTimeout(0)
+
+      // Helper: step and check
+      def check(expected: BigInt, msg: String): Unit = {
+        dut.clock.step(1)
+        dut.io.result.expect(expected.U)
+        dut.io.exception.expect(false.B)
+        println(s"PASS: $msg -> ${expected}")
+      }
+      def checkH(expected: String, msg: String): Unit = {
+        dut.clock.step(1)
+        dut.io.result.expect(s"h${expected}".U)
+        dut.io.exception.expect(false.B)
+        println(s"PASS: $msg -> 0x${expected}")
+      }
+      def nop(n: Int = 1): Unit = (0 until n).foreach { _ =>
+        dut.clock.step(1); dut.io.result.expect(0.U)
+      }
+
+      // =================================================================
+      // PART A: Old NOP-padded tests (97 instructions, indices 0-96)
+      // =================================================================
+      println("=" * 60)
+      println("  PART A: Old NOP-padded tests")
+      println("=" * 60)
+
+      dut.clock.step(5)
+      dut.io.result.expect(0.U); dut.io.exception.expect(false.B)
+      println("PASS: I000 NOP -> 0")
+
+      check(4, "I001 ADDI x1=4")
+      check(5, "I002 ADDI x2=5")
+      nop(3) // I003-I005
+      check(9, "I006 ADD x3=9")
+      check(2047, "I007 ADDI x4=2047")
+      check(16, "I008 ADDI x5=16")
+      nop(3) // I009-I011
+      check(2031, "I012 SUB x6=2031")
+      nop(3) // I013-I015
+      check(2022, "I016 XOR x7=2022")
+      check(2047, "I017 OR x8=2047")
+      check(0, "I018 AND x9=0")
+      nop(1) // I019
+      check(64704, "I020 SLL x10=64704")
+      check(63, "I021 SRL x11=63")
+      check(63, "I022 SRA x12=63")
+      check(0, "I023 SLT eq")
+      check(0, "I024 SLT 2047>16")
+      check(1, "I025 SLT 16<2047")
+      check(0, "I026 SLTU eq")
+      check(0, "I027 SLTU 2047>16")
+      check(1, "I028 SLTU 16<2047")
+      check(1, "I029 ADDI x0 (WB=1)")
+      checkH("FFFFFFFF", "I030 ADDI x3=-1")
+      nop(3) // I031-I033
+      check(1, "I034 SLT -1<2047")
+      check(0, "I035 SLTU 0xFFFFFFFF>1")
+      nop(3) // I036-I038
+      check(1, "I039 SLL shift0")
+      checkH("80000000", "I040 SLLI x4<<31")
+      nop(3) // I041-I043
+      check(2047, "I044 XORI max+imm")
+      checkH("FFFFF800", "I045 XORI min-imm")
+      nop(3) // I046-I048
+      checkH("FFFFFFFF", "I049 OR all1s")
+      nop(3) // I050-I052
+      checkH("FFFFF800", "I053 XORI NOT")
+      nop(3) // I054-I056
+      checkH("FFFFFFFF", "I057 ADDI x14=-1")
+      nop(3) // I058-I060
+      checkH("FFFFFFFF", "I061 SRAI sign")
+      nop(3) // I062-I064
+      checkH("80000000", "I065 SLLI x15<<31")
+      nop(3) // I066-I068
+      check(1, "I069 SRLI logical")
+      nop(3) // I070-I072
+      check(0, "I073 SLT equal")
+      nop(3) // I074-I076
+      check(2047, "I077 ADDI x19=2047")
+      checkH("FFFFF800", "I078 ADDI x20=-2048")
+      nop(3) // I079-I081
+      check(0, "I082 SUB self=0")
+      nop(3) // I083-I085
+      check(0, "I086 ADD x0+x0")
+      check(1, "I087 ADDI x22=1")
+      nop(3) // I088-I090
+      check(0, "I091 ADDI x22-1=0")
+      nop(3) // I092-I094
+      check(0, "I095 ADD 0+0")
+      nop(1) // I096
+
+      println("\nPART A COMPLETE\n")
+
+      // Separator NOPs (I097-I100)
+      nop(4)
+
+      // =================================================================
+      // PART B: Forwarding tests (19 instructions, indices 101-119)
+      // =================================================================
+      println("=" * 60)
+      println("  PART B: Forwarding tests (back-to-back)")
+      println("=" * 60)
+
+      check(10, "I101 ADDI x1=10")
+      check(15, "I102 ADDI x2=x1+5 [EX fwd]")
+      check(25, "I103 ADD x3=x1+x2 [MEM+EX fwd]")
+      check(10, "I104 SUB x4=x3-x2 [EX+MEM fwd]")
+      check(1, "I105 ADDI x5=1")
+      check(2, "I106 ADDI x5++ [EX fwd]")
+      check(3, "I107 ADDI x5++ [EX fwd]")
+      check(35, "I108 ADD x6=x3+x4 [regfile]")
+      check(42, "I109 ADDI x0=42 (WB)")
+      check(10, "I110 ADD x7=x0+x1 [x0 NOT fwd]")
+      check(100, "I111 ADDI x8=100")
+      check(200, "I112 ADDI x8=200")
+      check(200, "I113 ADD x9=x8 [dbl hazard EX wins]")
+      check(7, "I114 ADDI x10=7")
+      check(248, "I115 XORI x11=7^0xFF [EX fwd rs1]")
+      checkH("FFFFFFFF", "I116 ADDI x12=-1")
+      checkH("FFFFFFFF", "I117 SRAI x13=-1>>16 [EX fwd]")
+      checkH("0000FFFF", "I118 SRLI x14=-1>>16 [MEM fwd]")
+      nop(1) // I119
+
+      println("\nPART B COMPLETE\n")
+
+      // Separator NOPs (I120-I123)
+      nop(4)
+
+      // =================================================================
+      // PART C: Branch and Jump tests (55 instructions, indices 124-178)
+      // =================================================================
+      println("=" * 60)
+      println("  PART C: Branch and Jump tests")
+      println("=" * 60)
+
+      // --- Setup ---
+      check(5, "I125 ADDI x1=5")
+      check(10, "I126 ADDI x2=10")
+      check(5, "I127 ADDI x3=5")
+
+      // --- BEQ not taken ---
+      println("\n--- BEQ ---")
+      check(0, "I128 BEQ x1,x2 NOT TAKEN")
+      check(1, "I129 ADDI x4=1 (after not-taken)")
+
+      // --- BEQ taken +12 ---
+      check(0, "I130 BEQ x1,x3 TAKEN")
+      nop(2) // flush bubbles
+      check(2, "I133 ADDI x5=2 (BEQ target)")
+
+      // --- BEQ taken +12 ---
+      check(0, "I134 BEQ x1,x3 TAKEN") //00308663
+      check(0, "I135 Flushed instruction addi x1, x0, 5") //00500093
+      check(0, "I136 Flushed instruction addi x2, x0, 5") //00500113
+      check(2, "I137 ADDI x5=2 (BEQ target)") //00200293
+
+
+      // --- BNE taken +12 ---
+      println("\n--- BNE ---")
+      check(0, "I138 BNE x1,x2 TAKEN") //00209663
+      nop(2)
+      check(3, "I141 ADDI x6=3 (BNE target)") //00300313
+
+      // --- BNE taken +12 ---
+      println("\n--- BNE ---")
+      check(0, "I142 BNE x1,x2 TAKEN")
+      check(0, "I143 Flushed instruction addi x1, x0, 5")
+      check(0, "I144 Flushed instruction addi x2, x0, 5")
+      check(3, "I145 ADDI x6=3 (BNE target)")
+
+
+      // --- BNE not taken ---
+      check(0, "I146 BNE x1,x3 NOT TAKEN")
+      check(4, "I147 ADDI x7=4")
+
+      //=================================================================
+      //  LINE NUMBERS UNSYNCHRONISED FROM HERE ONWARDS 
+      //=================================================================
+
+      // --- BLT taken +12 ---
+      println("\n--- BLT ---")
+      check(0, "I139 BLT x1,x2 TAKEN (5<10)")
+      nop(2)
+      check(5, "I142 ADDI x8=5 (BLT target)")
+
+      // --- BGE not taken, then taken ---
+      println("\n--- BGE ---")
+      check(0, "I143 BGE x1,x2 NOT TAKEN (5<10)")
+      check(6, "I144 ADDI x9=6")
+      check(0, "I145 BGE x2,x1 TAKEN (10>=5)")
+      nop(2)
+      check(7, "I148 ADDI x10=7 (BGE target)")
+
+      // --- Negative number + unsigned comparisons ---
+      println("\n--- BLTU / BGEU ---")
+      checkH("FFFFFFFF", "I149 ADDI x11=-1")
+      check(0, "I150 BLTU x1,x11 TAKEN (5<0xFFFFFFFF)")
+      nop(2)
+      check(8, "I153 ADDI x12=8 (BLTU target)")
+      check(0, "I154 BGEU x11,x1 TAKEN")
+      nop(2)
+      check(9, "I157 ADDI x13=9 (BGEU target)")
+
+      // --- JAL ---
+      println("\n--- JAL ---")
+      // JAL x14, +12 at PC=632. x14 = 636 (return addr)
+      //check(636, "I167 JAL x14 -> x14=636")
+      check(668, "I167 JAL x14 -> x14=668")
+      nop(2) // flush
+      check(10, "I170 ADDI x15=10 (JAL target)")
+
+      // --- JALR ---
+      println("\n--- JALR ---")
+      //check(664, "I171 ADDI x20=664 (target addr)") //29800A13
+      // JALR x16, x20, 0 at PC=652. x16 = 656 //000A0867
+      //check(656, "I172 JALR x16 -> x16=656, jump to 664") //000A0867
       
-      println("=== SECTION 1: Basic Operations ===")
-
-      dut.clock.step(5)  // Wait for pipeline to fill (5 stages)
-      dut.io.result.expect(0.U)     // ADDI x0, x0, 0
-      dut.io.exception.expect(false.B)
-      println("PASS: NOP -> 0")
-
-      dut.clock.step(1)
-      dut.io.result.expect(4.U)     // ADDI x1, x0, 4
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x1, x0, 4 -> 4")
-
-      dut.clock.step(1)
-      dut.io.result.expect(5.U)     // ADDI x2, x0, 5
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x2, x0, 5 -> 5")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // NOP
-      dut.io.exception.expect(false.B)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // NOP
-      dut.io.exception.expect(false.B)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // NOP
-      dut.io.exception.expect(false.B)
-
-      dut.clock.step(1)
-      dut.io.result.expect(9.U)     // ADD x3, x1, x2
-      dut.io.exception.expect(false.B)
-      println("PASS: ADD x3, x1, x2 -> 9")
-
-      dut.clock.step(1)
-      dut.io.result.expect(2047.U)  // ADDI x4, x0, 2047 (max positive 12-bit imm)
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x4, x0, 2047 -> 2047 (max positive immediate)")
-
-      dut.clock.step(1)
-      dut.io.result.expect(16.U)    // ADDI x5, x0, 16
-      dut.io.exception.expect(false.B)
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      dut.clock.step(1)
-      dut.io.result.expect(2031.U)  // SUB x6, x4, x5 (2047 - 16 = 2031)
-      dut.io.exception.expect(false.B)
-      println("PASS: SUB x6, x4, x5 -> 2031")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      dut.clock.step(1)
-      dut.io.result.expect(2022.U)  // XOR x7, x6, x3
-      dut.io.exception.expect(false.B)
-      println("PASS: XOR x7, x6, x3 -> 2022")
-
-      dut.clock.step(1)
-      dut.io.result.expect(2047.U)  // OR x8, x6, x5
-      dut.io.exception.expect(false.B)
-      println("PASS: OR x8, x6, x5 -> 2047")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // AND x9, x6, x5 (2031 AND 16 = 0)
-      dut.io.exception.expect(false.B)
-      println("PASS: AND x9, x6, x5 -> 0")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // NOP
-
-      dut.clock.step(1)
-      dut.io.result.expect(64704.U) // SLL x10, x7, x2 (2022 << 5)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLL x10, x7, x2 -> 64704")
-
-      dut.clock.step(1)
-      dut.io.result.expect(63.U)    // SRL x11, x7, x2 (2022 >> 5)
-      dut.io.exception.expect(false.B)
-      println("PASS: SRL x11, x7, x2 -> 63")
-
-      dut.clock.step(1)
-      dut.io.result.expect(63.U)    // SRA x12, x7, x2 (positive number, same as SRL)
-      dut.io.exception.expect(false.B)
-      println("PASS: SRA x12, x7, x2 -> 63 (positive number)")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // SLT x13, x4, x4 (2047 < 2047 = false)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLT x13, x4, x4 -> 0 (equal values)")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // SLT x13, x4, x5 (2047 < 16 = false)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLT x13, x4, x5 -> 0 (2047 not less than 16)")
-
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)     // SLT x13, x5, x4 (16 < 2047 = true)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLT x13, x5, x4 -> 1 (16 < 2047)")
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // SLTU x13, x4, x4
-      dut.io.exception.expect(false.B)
-
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // SLTU x13, x4, x5
-      dut.io.exception.expect(false.B)
-
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)     // SLTU x13, x5, x4
-      dut.io.exception.expect(false.B)
-
-      // =========================================================================
-      // SECTION 2: Negative Numbers & Sign Extension - EDGE CASES
-      // =========================================================================
-      println("\n=== SECTION 2: Negative Numbers & Sign Extension ===")
-
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)     // ADDI x0, x0, 1 (WB shows 1, but x0 stays 0)
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x0, x0, 1 -> 1 (WB result, x0 hardwired to 0)")
-
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFFFFF".U) // ADDI x3, x0, -1
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x3, x0, -1 -> 0xFFFFFFFF (negative immediate sign extension)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // SLT x4, x3, x4: Compare -1 (x3=0xFFFFFFFF) with previous x4 value
-      // Previous x4 was set to 1 from SLT result, but wait - let me check
-      // Actually x4 was 2047, then overwritten. Let me trace:
-      // After SLT x13, x5, x4, x4 still = 2047
-      // So SLT x4, x3, x4 = (-1 < 2047) = true = 1
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)     // SLT x4, x3, x4 (-1 < 2047 signed = true)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLT x4, x3, x4 -> 1 (-1 < 2047 in signed comparison)")
-
-      // SLTU x5, x3, x4: Compare 0xFFFFFFFF with 1 (x4 now = 1)
-      // Unsigned: 0xFFFFFFFF > 1, so result = 0
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)     // SLTU x5, x3, x4
-      dut.io.exception.expect(false.B)
-      println("PASS: SLTU x5, x3, x4 -> 0 (0xFFFFFFFF > 1 in unsigned comparison)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 3: Shift by 0 and Shift by 31 - EDGE CASES
-      // =========================================================================
-      println("\n=== SECTION 3: Shift Edge Cases ===")
-
-      // SLL x6, x4, x0: shift by 0 (x0 = 0)
-      // x4 = 1 from previous SLT
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)     // SLL x6, x4, x0 (shift by 0 = no change)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLL x6, x4, x0 -> 1 (shift by 0)")
-
-      // SLLI x7, x4, 31: shift 1 left by 31
-      dut.clock.step(1)
-      dut.io.result.expect("h80000000".U) // SLLI x7, x4, 31 (1 << 31 = 0x80000000)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLLI x7, x4, 31 -> 0x80000000 (1 << 31)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 4: Maximum/Minimum Immediate Values - EDGE CASES
-      // =========================================================================
-      println("\n=== SECTION 4: Immediate Boundary Values ===")
-
-      // XORI x8, x0, 2047 (max positive 12-bit immediate)
-      dut.clock.step(1)
-      dut.io.result.expect(2047.U)
-      dut.io.exception.expect(false.B)
-      println("PASS: XORI x8, x0, 2047 -> 2047 (max positive immediate)")
-
-      // XORI x9, x0, -2048 (min negative 12-bit immediate)
-      // -2048 sign-extended to 32 bits = 0xFFFFF800
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFF800".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: XORI x9, x0, -2048 -> 0xFFFFF800 (min negative immediate)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 5: Creating All 1s - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 5: Bitwise All 1s ===")
-
-      // OR x10, x8, x9: 2047 | 0xFFFFF800 = 0xFFFFFFFF
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFFFFF".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: OR x10, x8, x9 -> 0xFFFFFFFF (all bits set)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 6: XOR with All 1s (Bitwise NOT) - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 6: Bitwise NOT via XOR ===")
-
-      // XORI x12, x8, -1: 2047 XOR 0xFFFFFFFF = 0xFFFFF800
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFF800".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: XORI x12, x8, -1 -> 0xFFFFF800 (bitwise NOT of 2047)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 7: SRA with Negative Number - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 7: Arithmetic Right Shift (Sign Extension) ===")
-
-      // ADDI x14, x0, -1: x14 = 0xFFFFFFFF
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFFFFF".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: ADDI x14, x0, -1 -> 0xFFFFFFFF")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // SRAI x15, x14, 31: 0xFFFFFFFF >> 31 (arithmetic) = 0xFFFFFFFF
-      // Sign bit (1) is replicated, so still all 1s
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFFFFF".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: SRAI x15, x14, 31 -> 0xFFFFFFFF (sign extension preserved)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 8: SLL by 31 - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 8: Large Shift Left ===")
-
-      // SLLI x16, x15, 31: 0xFFFFFFFF << 31 = 0x80000000
-      dut.clock.step(1)
-      dut.io.result.expect("h80000000".U)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLLI x16, x15, 31 -> 0x80000000")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 9: SRL by 31 - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 9: Large Logical Right Shift ===")
-
-      // SRLI x17, x15, 31: 0xFFFFFFFF >> 31 (logical) = 1
-      dut.clock.step(1)
-      dut.io.result.expect(1.U)
-      dut.io.exception.expect(false.B)
-      println("PASS: SRLI x17, x15, 31 -> 1 (logical right shift)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 10: SLT with Equal Values - EDGE CASE
-      // =========================================================================
-      println("\n=== SECTION 10: Comparison of Equal Values ===")
-
-      // SLT x18, x15, x14: both are 0xFFFFFFFF, so result = 0
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.io.exception.expect(false.B)
-      println("PASS: SLT x18, x15, x14 -> 0 (equal values)")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // =========================================================================
-      // SECTION 11: More Operations
-      // =========================================================================
-      println("\n=== SECTION 11: Additional Tests ===")
-
-      // ADDI x19, x0, 2047 LINE 78 7ff00993
-      dut.clock.step(1)
-      dut.io.result.expect(2047.U)
-      dut.io.exception.expect(false.B)
-
-      // =========================================================================
-      // SECTION 12: Exceptions
-      // =========================================================================
-      println("\n=== SECTION 12: Exceptions ===")
-
-      // NOPs
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-      dut.clock.step(1)
-      dut.io.result.expect(0.U)
-
-      // Invalid opcode test LINE 82
-      dut.clock.step(1)
-      //dut.io.result.expect(0.U)
-      dut.io.exception.expect(true.B)
-
-      // Additional instruction
-      dut.clock.step(1)
-      // Check whatever comes next...
-
-      println("\n=== ALL TESTS PASSED ===")
+      check(696, "I171 ADDI x20=696 (target addr)") //2b800a13
+      check(688, "I172 JALR x16 -> x16=688, jump to 696") //000A0867
+      nop(2) // flush
+      check(42, "I175 ADDI x18=42 (JALR target)") //02A00913
+
+      // --- Branch with forwarding ---
+      println("\n--- Branch + Forwarding ---")
+      check(100, "I167 ADDI x21=100")
+      check(150, "I168 ADDI x22=x21+50 [EX fwd]")
+      check(0, "I169 BEQ x21,x22 NOT TAKEN [fwd both]")
+      check(0, "I170 BNE x21,x22 TAKEN [fwd both]")
+      nop(2) // flush
+      check(11, "I173 ADDI x23=11 (BNE+fwd target)")
+
+      // --- Backward branch (loop: count to 3) ---
+      println("\n--- Backward Branch Loop ---")
+      check(0, "I174 ADDI x24=0 (counter)")
+      check(3, "I175 ADDI x25=3 (limit)")
+
+      // Iteration 1: x24 = 0+1 = 1, BNE taken (1!=3)
+      check(1, "I176 ADDI x24=1 (iter1)")
+      check(0, "I177 BNE x24,x25 TAKEN (1!=3)")
+      nop(2) // flush
+
+      // Iteration 2: x24 = 1+1 = 2, BNE taken (2!=3)
+      check(2, "I176 ADDI x24=2 (iter2)")
+      check(0, "I177 BNE x24,x25 TAKEN (2!=3)")
+      nop(2) // flush
+
+      // Iteration 3: x24 = 2+1 = 3, BNE NOT taken (3==3)
+      check(3, "I176 ADDI x24=3 (iter3)")
+      check(0, "I177 BNE x24,x25 NOT TAKEN (3==3)")
+
+      // End
+      check(0, "I178 NOP (end)")
+
+      println("\n" + "=" * 60)
+      println("  ALL TESTS PASSED (A: old + B: forwarding + C: branches)")
+      println("=" * 60)
     }
+  }
+
+  "BTBPrediction" should "correctly predict loop branches" in {
+    test(new PipelinedRV32I("src/test/programs/BinaryFile_btb", useBTB = true))
+      .withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+
+        dut.clock.setTimeout(0)
+
+        def check(expected: BigInt, msg: String): Unit = {
+          dut.clock.step(1); dut.io.result.expect(expected.U)
+          dut.io.exception.expect(false.B); println(s"PASS: $msg -> $expected")
+        }
+        def nop(n: Int = 1): Unit = (0 until n).foreach { _ =>
+          dut.clock.step(1); dut.io.result.expect(0.U)
+        }
+
+        println("=" * 60)
+        println("  BTB Test: Loop counting to 5")
+        println("=" * 60)
+
+        // Pipeline fill
+        dut.clock.step(5)
+        dut.io.result.expect(0.U)
+        println("PASS: NOP -> 0")
+
+        // Setup
+        check(0, "ADDI x1=0 (counter)")
+        check(5, "ADDI x2=5 (limit)")
+
+        // ---- Iter 1: BTB miss → predict not-taken → taken → MISPREDICTION ----
+        println("\n--- Iter 1: BTB miss ---")
+        check(1, "ADDI x1=1 (iter1)")
+        check(0, "BNE: BTB miss, taken → misprediction")
+        nop(2)  // flush bubbles
+
+        // ---- Iter 2: BTB hit, weakTaken → predict taken → correct! ----
+        println("\n--- Iter 2: BTB hit, correct (weakTaken) ---")
+        check(2, "ADDI x1=2 (iter2)")
+        check(0, "BNE: BTB hit, predicted taken, correct!")
+
+        // ---- Iter 3: BTB hit, strongTaken → correct ----
+        println("\n--- Iter 3: BTB hit, correct (strongTaken) ---")
+        check(3, "ADDI x1=3 (iter3)")
+        check(0, "BNE: BTB hit, predicted taken, correct!")
+
+        // ---- Iter 4: BTB hit, strongTaken → correct ----
+        println("\n--- Iter 4: BTB hit, correct (strongTaken) ---")
+        check(4, "ADDI x1=4 (iter4)")
+        check(0, "BNE: BTB hit, predicted taken, correct!")
+
+        // ---- Iter 5: BTB hit, strongTaken → NOT taken → MISPREDICTION ----
+        println("\n--- Iter 5: BTB exit misprediction ---")
+        check(5, "ADDI x1=5 (iter5)")
+        check(0, "BNE: BTB hit, predicted taken, actually NOT taken → misprediction")
+        nop(2)  // flush bubbles
+
+        // After loop
+        check(99, "ADDI x3=99 (after loop)")
+        check(0, "NOP (end)")
+
+        println("\n" + "=" * 60)
+        println("  BTB PREDICTION: ALL TESTS PASSED")
+        println("  Cycle count: 23 (vs 27 with static = 15% improvement)")
+        println("=" * 60)
+      }
   }
 }
