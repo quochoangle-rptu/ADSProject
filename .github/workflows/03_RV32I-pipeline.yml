@@ -7,9 +7,9 @@ name: 03_RV32I-pipeline
 
 on:
   push:
-    branches: [ "hoangworkspace" ]
+    branches: [ "Group03" ]
   pull_request:
-    branches: [ "hoangworkspace" ]
+    branches: [ "Group03" ]
 
 permissions:
   contents: read
